@@ -1,10 +1,12 @@
 use hyperfold_engine;
 use hyperfold_engine::ecs;
+use hyperfold_engine::{sdl2, sdl2_image};
 
 mod crystal;
 mod wizard;
 
 ecs::component_manager!();
+
 fn main() {
     println!("Hello, world!");
 
