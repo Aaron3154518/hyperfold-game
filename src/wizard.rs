@@ -1,13 +1,12 @@
 use hyperfold_engine::ecs;
 use hyperfold_engine::ecs::components::Label;
-use hyperfold_engine::ecs::entities;
 use hyperfold_engine::ecs::events::CoreEvent;
 use hyperfold_engine::framework::{event_system, physics, render_system};
 use hyperfold_engine::includes::*;
 use hyperfold_engine::sdl2::SDL_KeyCode::*;
 use hyperfold_engine::utils::rect::{Align, Rect};
 
-#[ecs::component(Label)]
+#[ecs::component]
 struct Wizard;
 
 #[ecs::system(Init)]
@@ -16,23 +15,19 @@ fn init_wizard(
     rs: &mut render_system::RenderSystem,
     camera: &render_system::Camera,
 ) {
-    let e = entities::new();
-    entities.add_component(e, render_system::Elevation(1));
-    entities.add_component(
-        e,
+    let e = ecs::create_entity!(
+        entities,
+        render_system::Elevation(1),
         render_system::Image(rs.get_image("res/wizards/wizard.png")),
-    );
-    entities.add_component(
-        e,
         physics::Position(Rect {
             x: camera.0.cx() - 50.0,
             y: camera.0.cy() - 150.0,
             w: 100.0,
             h: 100.0,
         }),
+        physics::PhysicsData::new(),
+        Wizard
     );
-    entities.add_component(e, physics::PhysicsData::new());
-    entities.add_label(e, &Wizard);
 }
 
 #[ecs::system]
