@@ -54,7 +54,7 @@ impl FileType {
             "Failed to parse file contents of: {}",
             path.display()
         ));
-        let mut file_mod = Mod::new();
+        let mut file_mod = Mod::new(mods.to_vec());
         file_mod.visit_file(&ast);
         Self::File { path, file_mod }
     }

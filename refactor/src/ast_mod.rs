@@ -2,7 +2,7 @@ use std::{fs, path::PathBuf};
 
 use syn::visit::Visit;
 
-use crate::util::Expect;
+use crate::util::{end, Expect};
 
 #[derive(Debug)]
 struct Symbol {
@@ -20,9 +20,9 @@ pub struct Mod {
 }
 
 impl Mod {
-    pub fn new() -> Self {
+    pub fn new(path: Vec<String>) -> Self {
         Self {
-            path: Vec::new(),
+            path,
             mods: Vec::new(),
             neighbors: Vec::new(),
             pub_symbols: Vec::new(),
@@ -76,7 +76,7 @@ impl Mod {
             }
             .push(Symbol {
                 ident: ident.to_string(),
-                alias: Vec::new(),
+                alias: [self.path.to_owned(), vec![ident.to_string()]].concat(),
             })
         }
 
@@ -96,7 +96,8 @@ impl Mod {
         match &i.content {
             // Parse inner mod
             Some((_, items)) => {
-                let mut new_mod = Mod::new();
+                let mut new_mod =
+                    Mod::new([self.path.to_vec(), vec![i.ident.to_string()]].concat());
                 new_mod.visit_items(items);
                 self.mods.push(new_mod);
             }
@@ -138,7 +139,15 @@ impl Mod {
         path: &mut Vec<String>,
         items: Vec<Symbol>,
     ) -> Vec<Symbol> {
-        path.push(i.ident.to_string());
+        if i.ident == "super" {
+            if path.is_empty() {
+                *path = self.path[..end(&self.path, 1)].to_vec()
+            } else {
+                path.pop();
+            }
+        } else {
+            path.push(i.ident.to_string())
+        }
         self.visit_use_tree(&i.tree, path, items)
     }
 

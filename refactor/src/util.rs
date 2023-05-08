@@ -16,3 +16,8 @@ where
         self.expect(err.as_str())
     }
 }
+
+#[inline]
+pub fn end<T>(v: &Vec<T>, off: usize) -> usize {
+    v.len().max(off) - off
+}
