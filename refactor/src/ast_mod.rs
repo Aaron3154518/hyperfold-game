@@ -8,7 +8,8 @@ use crate::util::Expect;
 pub struct Mod {
     path: Vec<String>,
     mods: Vec<Mod>,
-    symbols: Vec<String>,
+    pub_symbols: Vec<String>,
+    pri_symbols: Vec<String>,
 }
 
 impl Mod {
@@ -16,30 +17,36 @@ impl Mod {
         Self {
             path: Vec::new(),
             mods: Vec::new(),
-            symbols: Vec::new(),
+            pub_symbols: Vec::new(),
+            pri_symbols: Vec::new(),
         }
     }
 }
 
 impl<'ast> syn::visit::Visit<'ast> for Mod {
     fn visit_file(&mut self, i: &'ast syn::File) {
+        // Iter once to add to symbol table
         for i in i.items.iter() {
             match i {
-                syn::Item::Mod(i) => (),
+                syn::Item::Mod(i) => {}
                 syn::Item::Use(i) => (),
                 syn::Item::Fn(i) => (),
                 syn::Item::Enum(i) => (),
                 syn::Item::Struct(i) => (),
                 // Add to the symbol table and ignore
-                syn::Item::Const(syn::ItemConst { ident, .. })
-                | syn::Item::ExternCrate(syn::ItemExternCrate { ident, .. })
-                | syn::Item::Static(syn::ItemStatic { ident, .. })
-                | syn::Item::Trait(syn::ItemTrait { ident, .. })
-                | syn::Item::TraitAlias(syn::ItemTraitAlias { ident, .. })
-                | syn::Item::Type(syn::ItemType { ident, .. })
-                | syn::Item::Union(syn::ItemUnion { ident, .. }) => {
-                    self.symbols.push(ident.to_string())
+                syn::Item::Const(syn::ItemConst { ident, vis, .. })
+                | syn::Item::ExternCrate(syn::ItemExternCrate { ident, vis, .. })
+                | syn::Item::Static(syn::ItemStatic { ident, vis, .. })
+                | syn::Item::Trait(syn::ItemTrait { ident, vis, .. })
+                | syn::Item::TraitAlias(syn::ItemTraitAlias { ident, vis, .. })
+                | syn::Item::Type(syn::ItemType { ident, vis, .. })
+                | syn::Item::Union(syn::ItemUnion { ident, vis, .. }) => match vis {
+                    syn::Visibility::Public(_) => &mut self.pub_symbols,
+                    syn::Visibility::Restricted(_) | syn::Visibility::Inherited => {
+                        &mut self.pri_symbols
+                    }
                 }
+                .push(ident.to_string()),
                 // Ignore completely
                 syn::Item::ForeignMod(..)
                 | syn::Item::Impl(..)
