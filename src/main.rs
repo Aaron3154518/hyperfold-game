@@ -1,6 +1,9 @@
-use hyperfold_engine;
 use hyperfold_engine::ecs;
 use hyperfold_engine::{sdl2, sdl2_image};
+
+#[ecs::dependency]
+use hyperfold_engine as hfe;
+use hyperfold_engine;
 
 mod crystal;
 mod wizard;

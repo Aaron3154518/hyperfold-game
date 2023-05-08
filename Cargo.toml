@@ -7,6 +7,6 @@ edition = "2021"
 
 [dependencies.hyperfold_engine]
 version = "0.1.0"
-path = "./hyperfold-engine/"
+path = "./dummy/hyperfold-engine/"
 package = "hyperfold_engine"
 features = []
