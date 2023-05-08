@@ -14,8 +14,8 @@ pub enum DirType {
 impl DirType {
     fn to_string(&self) -> &str {
         match self {
-            Self::Main => "src/main.rs",
-            Self::Lib => "src/lib.rs",
+            Self::Main => "main.rs",
+            Self::Lib => "lib.rs",
             Self::Mod => "mod.rs",
         }
     }
@@ -34,13 +34,16 @@ pub enum FileType {
 }
 
 impl FileType {
-    pub fn parse(path: PathBuf, mods: &Vec<String>) -> Self {
+    pub fn parse(mut path: PathBuf, mods: &Vec<String>) -> Self {
         if path.is_dir() {
             Self::parse_dir(path, mods, DirType::Mod)
-        } else if path.is_file() {
-            Self::parse_file(path, mods)
         } else {
-            panic!("File does not exist: {}", path.display())
+            path.set_extension("rs");
+            if path.is_file() {
+                Self::parse_file(path, mods)
+            } else {
+                panic!("File does not exist: {}", path.display())
+            }
         }
     }
 
@@ -57,11 +60,29 @@ impl FileType {
     }
 
     pub fn parse_dir(path: PathBuf, mods: &Vec<String>, ty: DirType) -> Self {
-        let mod_rs = Self::parse_file(path.join(ty.to_string()), mods);
-        // TODO: get siblings from mod declarations
+        // Parse first file
+        let mod_file = Self::parse_file(path.join(ty.to_string()), mods);
+        // Parse children
+        let mut children = match &mod_file {
+            FileType::File { file_mod, .. } => file_mod
+                .get_neighbors()
+                .iter()
+                .map(|name| {
+                    Self::parse(
+                        path.join(name),
+                        &[mods.to_vec(), vec![name.to_string()]].concat(),
+                    )
+                })
+                .collect::<Vec<_>>(),
+            FileType::Dir { .. } => panic!(
+                "Found directory when attempting to parse mod file: {}",
+                path.display()
+            ),
+        };
+        children.insert(0, mod_file);
         Self::Dir {
             dir: path,
-            children: vec![mod_rs],
+            children,
         }
     }
 }

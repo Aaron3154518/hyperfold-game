@@ -13,6 +13,7 @@ pub fn T7() {}
 enum T8 {}
 
 mod a1;
+mod a2;
 
 fn main() {
     println!("Hello, world!");

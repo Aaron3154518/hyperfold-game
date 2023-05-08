@@ -9,6 +9,6 @@ mod ast_mod;
 mod util;
 
 fn main() {
-    let mut cr = Crate::new(PathBuf::from("test/a"), true);
+    let mut cr = Crate::new(PathBuf::from("test/a/src"), true);
     println!("{:#?}", cr);
 }
