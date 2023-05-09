@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 b = { path= "./b" }
 c = { path= "./c" }
+macros = { path = "../../macros" }

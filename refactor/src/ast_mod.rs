@@ -2,13 +2,47 @@ use std::{fs, path::PathBuf};
 
 use syn::visit::Visit;
 
-use crate::util::{end, Expect};
+use crate::{
+    ast_attrs::{get_attributes_if_active, Attribute, EcsAttribute},
+    util::{end, Expect},
+};
 
 #[derive(Debug)]
+pub enum MarkType {
+    Struct,
+    Fn,
+    Enum,
+    Use,
+}
+
+// TODO: Cfg features
+#[derive(Debug)]
+pub struct MarkedItem {
+    ty: MarkType,
+    sym: Symbol,
+    attrs: Vec<(Vec<String>, Vec<String>)>,
+}
+
+#[derive(Clone, Debug)]
 pub struct Symbol {
     pub ident: String,
     pub path: Vec<String>,
     pub public: bool,
+}
+
+impl Symbol {
+    pub fn from(mut path: Vec<String>, ident: &syn::Ident, vis: &syn::Visibility) -> Self {
+        path.push(ident.to_string());
+        // Add to the symbol table
+        Self {
+            ident: ident.to_string(),
+            path,
+            public: match vis {
+                syn::Visibility::Public(_) => true,
+                syn::Visibility::Restricted(_) | syn::Visibility::Inherited => false,
+            },
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -28,6 +62,7 @@ pub struct Mod {
     pub mods: Vec<Mod>,
     pub symbols: Vec<Symbol>,
     pub uses: Vec<Symbol>,
+    pub marked: Vec<MarkedItem>,
 }
 
 impl Mod {
@@ -39,6 +74,7 @@ impl Mod {
             mods: Vec::new(),
             symbols: Vec::new(),
             uses: Vec::new(),
+            marked: Vec::new(),
         }
     }
 
@@ -63,12 +99,16 @@ impl Mod {
 
     fn visit_item(&mut self, i: &syn::Item) {
         // Match once to add to symbol table
-        if let Some((ident, vis)) = match i {
+        match i {
             // Use statements need to be parsed
             syn::Item::Use(i) => None,
             // Add to symbol table
-            syn::Item::Fn(i) => Some((&i.sig.ident, &i.vis)),
-            syn::Item::Mod(syn::ItemMod { ident, vis, .. })
+            syn::Item::Fn(syn::ItemFn {
+                sig: syn::Signature { ident, .. },
+                vis,
+                ..
+            })
+            | syn::Item::Mod(syn::ItemMod { ident, vis, .. })
             | syn::Item::Enum(syn::ItemEnum { ident, vis, .. })
             | syn::Item::Struct(syn::ItemStruct { ident, vis, .. })
             | syn::Item::Const(syn::ItemConst { ident, vis, .. })
@@ -85,61 +125,111 @@ impl Mod {
             | syn::Item::Macro(..)
             | syn::Item::Verbatim(..)
             | _ => None,
-        } {
-            // Add to the symbol table
-            self.symbols.push(Symbol {
-                ident: ident.to_string(),
-                path: [self.path.to_owned(), vec![ident.to_string()]].concat(),
-                public: match vis {
-                    syn::Visibility::Public(_) => true,
-                    syn::Visibility::Restricted(_) | syn::Visibility::Inherited => false,
-                },
-            })
         }
+        .map(|(ident, vis)| {
+            self.symbols
+                .push(Symbol::from(self.path.to_vec(), ident, vis))
+        });
 
         // Match again to parse
         match i {
             syn::Item::Mod(i) => self.visit_item_mod(i),
             syn::Item::Use(i) => self.visit_item_use(i),
-            syn::Item::Fn(i) => (),
-            syn::Item::Enum(i) => (),
-            syn::Item::Struct(i) => (),
+            syn::Item::Fn(i) => self.visit_item_fn(i),
+            syn::Item::Enum(i) => self.visit_item_enum(i),
+            syn::Item::Struct(i) => self.visit_item_struct(i),
             _ => (),
         }
     }
 
     // Mod
     fn visit_item_mod(&mut self, i: &syn::ItemMod) {
-        match &i.content {
-            // Parse inner mod
-            Some((_, items)) => {
-                let mut new_mod = Self::new(
-                    self.dir.to_owned(),
-                    [self.path.to_vec(), vec![i.ident.to_string()]].concat(),
-                    ModType::Internal,
-                );
-                new_mod.visit_items(items);
-                self.mods.push(new_mod);
+        if let Some(attrs) = get_attributes_if_active(&i.attrs, &Vec::new()) {
+            match &i.content {
+                // Parse inner mod
+                Some((_, items)) => {
+                    let mut new_mod = Self::new(
+                        self.dir.to_owned(),
+                        [self.path.to_vec(), vec![i.ident.to_string()]].concat(),
+                        ModType::Internal,
+                    );
+                    new_mod.visit_items(items);
+                    self.mods.push(new_mod);
+                }
+                // Parse file mod
+                None => {
+                    self.mods.push(Self::parse_mod(
+                        self.dir.join(i.ident.to_string()),
+                        &[self.path.to_vec(), vec![i.ident.to_string()]].concat(),
+                    ));
+                }
             }
-            // Parse file mod
-            None => {
-                self.mods.push(Self::parse_mod(
-                    self.dir.join(i.ident.to_string()),
-                    &[self.path.to_vec(), vec![i.ident.to_string()]].concat(),
-                ));
+        }
+    }
+
+    // Components
+    fn visit_item_struct(&mut self, i: &syn::ItemStruct) {
+        if let Some(attrs) = get_attributes_if_active(&i.attrs, &Vec::new()) {
+            if !attrs.is_empty() {
+                self.marked.push(MarkedItem {
+                    ty: MarkType::Struct,
+                    sym: Symbol::from(self.path.to_vec(), &i.ident, &i.vis),
+                    attrs,
+                });
+            }
+        }
+    }
+
+    // Systems
+    fn visit_item_fn(&mut self, i: &syn::ItemFn) {
+        if let Some(attrs) = get_attributes_if_active(&i.attrs, &Vec::new()) {
+            if !attrs.is_empty() {
+                self.marked.push(MarkedItem {
+                    ty: MarkType::Fn,
+                    sym: Symbol::from(self.path.to_vec(), &i.sig.ident, &i.vis),
+                    attrs,
+                });
+            }
+        }
+    }
+
+    // Events
+    fn visit_item_enum(&mut self, i: &syn::ItemEnum) {
+        if let Some(attrs) = get_attributes_if_active(&i.attrs, &Vec::new()) {
+            if !attrs.is_empty() {
+                self.marked.push(MarkedItem {
+                    ty: MarkType::Enum,
+                    sym: Symbol::from(self.path.to_vec(), &i.ident, &i.vis),
+                    attrs,
+                });
             }
         }
     }
 
     // Use paths
     fn visit_item_use(&mut self, i: &syn::ItemUse) {
-        let mut uses = self.visit_use_tree(&i.tree, &mut Vec::new(), Vec::new());
-        let public = match i.vis {
-            syn::Visibility::Public(_) => true,
-            syn::Visibility::Restricted(_) | syn::Visibility::Inherited => false,
-        };
-        uses.iter_mut().for_each(|u| u.public = public);
-        self.uses.append(&mut uses);
+        if let Some(attrs) = get_attributes_if_active(&i.attrs, &Vec::new()) {
+            let mut uses = self.visit_use_tree(&i.tree, &mut Vec::new(), Vec::new());
+            let public = match i.vis {
+                syn::Visibility::Public(_) => true,
+                syn::Visibility::Restricted(_) | syn::Visibility::Inherited => false,
+            };
+            uses.iter_mut().for_each(|u| u.public = public);
+            if !attrs.is_empty() {
+                // Add marked
+                self.marked.append(
+                    &mut uses
+                        .iter()
+                        .map(|sym| MarkedItem {
+                            ty: MarkType::Use,
+                            sym: sym.to_owned(),
+                            attrs: attrs.to_vec(),
+                        })
+                        .collect::<Vec<_>>(),
+                );
+            }
+            self.uses.append(&mut uses);
+        }
     }
 
     fn visit_use_tree(

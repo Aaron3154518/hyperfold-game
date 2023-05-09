@@ -1,8 +1,9 @@
 #![allow(unused)]
-use std::path::PathBuf;
+use std::{fs::File, io::Read, path::PathBuf};
 
 use ast_crate::Crate;
 
+mod ast_attrs;
 mod ast_crate;
 mod ast_file;
 mod ast_mod;

@@ -1,4 +1,8 @@
+use macros::dependency;
+
+#[macros::dependency]
 use b;
+#[dependency]
 use c;
 
 pub const T1: u8 = 0;
