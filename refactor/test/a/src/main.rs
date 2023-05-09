@@ -1,7 +1,7 @@
 use macros::dependency;
 
 #[macros::dependency]
-use b;
+use b as b2;
 #[dependency]
 use c;
 

@@ -17,6 +17,18 @@ where
     }
 }
 
+pub trait Get<T> {
+    fn get(self) -> T;
+}
+
+impl<T> Get<T> for Result<T, T> {
+    fn get(self) -> T {
+        match self {
+            Ok(t) | Err(t) => t,
+        }
+    }
+}
+
 #[inline]
 pub fn end<T>(v: &Vec<T>, off: usize) -> usize {
     v.len().max(off) - off

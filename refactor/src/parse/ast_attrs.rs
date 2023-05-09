@@ -31,10 +31,10 @@ pub enum Attribute {
 }
 
 impl Attribute {
-    fn from(value: String) -> Self {
-        match value.as_str() {
+    fn from(value: Vec<String>) -> Self {
+        match value.join("::").as_str() {
             "cfg" => Self::Cfg(Cfg::Is(String::new())),
-            s => Self::Ecs(s.split("::").map(|s| s.to_string()).collect(), Vec::new()), // _ => EcsAttribute::from(value).map(|e| Self::Ecs(e, Vec::new())),
+            s => Self::Ecs(value, Vec::new()), // _ => EcsAttribute::from(value).map(|e| Self::Ecs(e, Vec::new())),
         }
     }
 }
@@ -62,11 +62,17 @@ pub fn get_attributes_if_active(
 pub fn get_attributes(attrs: &Vec<syn::Attribute>) -> Vec<Attribute> {
     attrs
         .iter()
-        .filter_map(|a| {
-            a.path()
-                .segments
-                .last()
-                .map(|s| parse_attr_args(Attribute::from(s.ident.to_string()), a))
+        .map(|a| {
+            parse_attr_args(
+                Attribute::from(
+                    a.path()
+                        .segments
+                        .iter()
+                        .map(|s| s.ident.to_string())
+                        .collect(),
+                ),
+                a,
+            )
         })
         .collect()
 }

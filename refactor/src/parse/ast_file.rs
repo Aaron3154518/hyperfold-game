@@ -2,10 +2,8 @@ use std::{fs, path::PathBuf};
 
 use syn::visit::Visit;
 
-use crate::{
-    ast_mod::{Mod, ModType},
-    util::Expect,
-};
+use super::ast_mod::{Mod, ModType};
+use crate::util::Expect;
 
 #[derive(Debug)]
 pub enum DirType {
@@ -34,6 +32,7 @@ impl From<DirType> for ModType {
     }
 }
 
+// Pass 1: parsing
 impl Mod {
     pub fn parse_mod(path: PathBuf, mods: &Vec<String>) -> Self {
         if path.is_dir() {

@@ -1,13 +1,13 @@
 #![allow(unused)]
 use std::{fs::File, io::Read, path::PathBuf};
 
-use ast_crate::Crate;
+use parse::ast_crate::Crate;
+use resolve::ast_resolve;
 
-mod ast_attrs;
-mod ast_crate;
-mod ast_file;
-mod ast_mod;
-mod ast_use;
+use crate::resolve::ast_items::ItemsCrate;
+
+mod parse;
+mod resolve;
 mod util;
 
 fn main() {
@@ -28,7 +28,16 @@ fn main() {
         println!(
             "{}\n{:#?}",
             v.join("::"),
-            ast_use::resolve(&mut v.iter().map(|s| s.to_string()).collect(), &crates)
+            ast_resolve::resolve(&mut v.iter().map(|s| s.to_string()).collect(), &crates)
         )
     }
+    let items = crates
+        .iter()
+        .map(|cr| {
+            let mut ic = ItemsCrate::new();
+            ic.parse_crate(cr, &crates);
+            ic
+        })
+        .collect::<Vec<_>>();
+    println!("{:#?}", items);
 }

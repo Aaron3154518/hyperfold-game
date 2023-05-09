@@ -3,7 +3,7 @@ use std::{fs, path::PathBuf};
 use syn::visit::Visit;
 
 use crate::{
-    ast_attrs::{get_attributes_if_active, Attribute, EcsAttribute},
+    parse::ast_attrs::{get_attributes_if_active, Attribute, EcsAttribute},
     util::{end, Expect},
 };
 
@@ -18,9 +18,9 @@ pub enum MarkType {
 // TODO: Cfg features
 #[derive(Debug)]
 pub struct MarkedItem {
-    ty: MarkType,
-    sym: Symbol,
-    attrs: Vec<(Vec<String>, Vec<String>)>,
+    pub ty: MarkType,
+    pub sym: Symbol,
+    pub attrs: Vec<(Vec<String>, Vec<String>)>,
 }
 
 #[derive(Clone, Debug)]
@@ -65,6 +65,7 @@ pub struct Mod {
     pub marked: Vec<MarkedItem>,
 }
 
+// Pass 1: parsing
 impl Mod {
     pub fn new(dir: PathBuf, path: Vec<String>, ty: ModType) -> Self {
         Self {

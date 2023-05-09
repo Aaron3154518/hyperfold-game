@@ -6,7 +6,8 @@ use std::{
     path::PathBuf,
 };
 
-use crate::{ast_file::DirType, ast_mod::Mod, util::Expect};
+use super::{ast_file::DirType, ast_mod::Mod};
+use crate::util::Expect;
 
 #[derive(Debug)]
 pub struct Crate {
