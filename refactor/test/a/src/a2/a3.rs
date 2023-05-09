@@ -2,6 +2,7 @@ use std::hash;
 
 mod A {
     pub use super::B::A as A1;
+    use A as A2;
     pub struct A;
     impl A {
         pub fn foo(&self) {
@@ -20,3 +21,5 @@ mod B {
         }
     }
 }
+
+use B::A2;

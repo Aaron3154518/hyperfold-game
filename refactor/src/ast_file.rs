@@ -2,7 +2,11 @@ use std::{fs, path::PathBuf};
 
 use syn::visit::Visit;
 
-use crate::{ast_mod::Mod, util::Expect};
+use crate::{
+    ast_mod::{Mod, ModType},
+    ast_visitor::Visited,
+    util::Expect,
+};
 
 #[derive(Debug)]
 pub enum DirType {
@@ -12,77 +16,58 @@ pub enum DirType {
 }
 
 impl DirType {
-    fn to_string(&self) -> &str {
+    pub fn to_file(&self) -> &str {
         match self {
-            Self::Main => "main.rs",
-            Self::Lib => "lib.rs",
-            Self::Mod => "mod.rs",
+            DirType::Main => "main.rs",
+            DirType::Lib => "lib.rs",
+            DirType::Mod => "mod.rs",
         }
     }
 }
 
-#[derive(Debug)]
-pub enum FileType {
-    File {
-        path: PathBuf,
-        file_mod: Mod,
-    },
-    Dir {
-        dir: PathBuf,
-        children: Vec<FileType>,
-    },
+impl From<DirType> for ModType {
+    fn from(value: DirType) -> Self {
+        match value {
+            DirType::Main => Self::Main,
+            DirType::Lib => Self::Lib,
+            DirType::Mod => Self::Mod,
+        }
+    }
 }
 
-impl FileType {
-    pub fn parse(mut path: PathBuf, mods: &Vec<String>) -> Self {
+impl Mod {
+    pub fn parse(path: PathBuf, mods: &Vec<String>) -> Self {
         if path.is_dir() {
             Self::parse_dir(path, mods, DirType::Mod)
         } else {
-            path.set_extension("rs");
-            if path.is_file() {
-                Self::parse_file(path, mods)
+            let mut f_path = path.to_owned();
+            f_path.set_extension("rs");
+            if f_path.is_file() {
+                Self::parse_file(path, f_path, mods, ModType::File)
             } else {
-                panic!("File does not exist: {}", path.display())
+                panic!("File does not exist: {}", f_path.display())
             }
         }
     }
 
-    pub fn parse_file(path: PathBuf, mods: &Vec<String>) -> Self {
+    pub fn parse_file(dir: PathBuf, path: PathBuf, mods: &Vec<String>, ty: ModType) -> Self {
         let file_contents = fs::read_to_string(path.to_owned())
             .catch(format!("Failed to read file: {}", path.display()));
         let ast = syn::parse_file(&file_contents).catch(format!(
             "Failed to parse file contents of: {}",
             path.display()
         ));
-        let mut file_mod = Mod::new(mods.to_vec());
+        let mut file_mod = Self::new(dir, mods.to_vec(), ty);
         file_mod.visit_file(&ast);
-        Self::File { path, file_mod }
+        file_mod
     }
 
     pub fn parse_dir(path: PathBuf, mods: &Vec<String>, ty: DirType) -> Self {
-        // Parse first file
-        let mod_file = Self::parse_file(path.join(ty.to_string()), mods);
-        // Parse children
-        let mut children = match &mod_file {
-            FileType::File { file_mod, .. } => file_mod
-                .get_neighbors()
-                .iter()
-                .map(|name| {
-                    Self::parse(
-                        path.join(name),
-                        &[mods.to_vec(), vec![name.to_string()]].concat(),
-                    )
-                })
-                .collect::<Vec<_>>(),
-            FileType::Dir { .. } => panic!(
-                "Found directory when attempting to parse mod file: {}",
-                path.display()
-            ),
-        };
-        children.insert(0, mod_file);
-        Self::Dir {
-            dir: path,
-            children,
-        }
+        Self::parse_file(
+            path.to_owned(),
+            path.join(ty.to_file()),
+            mods,
+            ModType::from(ty),
+        )
     }
 }

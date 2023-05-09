@@ -2,41 +2,55 @@ use std::{fs, path::PathBuf};
 
 use syn::visit::Visit;
 
-use crate::util::{end, Expect};
+use crate::{
+    ast_visitor::Visited,
+    util::{end, Expect},
+};
 
 #[derive(Debug)]
-struct Symbol {
-    ident: String,
-    alias: Vec<String>,
+pub struct Symbol {
+    pub ident: String,
+    pub path: Vec<String>,
+}
+
+#[derive(Debug)]
+pub enum ModType {
+    Main,
+    Lib,
+    Mod,
+    File,
+    Internal,
 }
 
 #[derive(Debug)]
 pub struct Mod {
-    path: Vec<String>,
-    mods: Vec<Mod>,
-    neighbors: Vec<String>,
-    pub_symbols: Vec<Symbol>,
-    pri_symbols: Vec<Symbol>,
+    pub ty: ModType,
+    pub dir: PathBuf,
+    pub path: Vec<String>,
+    pub mods: Vec<Mod>,
+    pub pub_symbols: Vec<Symbol>,
+    pub pri_symbols: Vec<Symbol>,
+    pub pub_uses: Vec<Symbol>,
+    pub pri_uses: Vec<Symbol>,
 }
 
 impl Mod {
-    pub fn new(path: Vec<String>) -> Self {
+    pub fn new(dir: PathBuf, path: Vec<String>, ty: ModType) -> Self {
         Self {
+            ty,
+            dir,
             path,
             mods: Vec::new(),
-            neighbors: Vec::new(),
             pub_symbols: Vec::new(),
             pri_symbols: Vec::new(),
+            pub_uses: Vec::new(),
+            pri_uses: Vec::new(),
         }
-    }
-
-    pub fn get_neighbors(&self) -> Vec<String> {
-        self.neighbors.to_vec()
     }
 
     // File/items
     pub fn visit_file(&mut self, i: &syn::File) {
-        self.visit_items(&i.items)
+        self.visit_items(&i.items);
     }
 
     fn visit_items(&mut self, i: &Vec<syn::Item>) {
@@ -76,7 +90,7 @@ impl Mod {
             }
             .push(Symbol {
                 ident: ident.to_string(),
-                alias: [self.path.to_owned(), vec![ident.to_string()]].concat(),
+                path: [self.path.to_owned(), vec![ident.to_string()]].concat(),
             })
         }
 
@@ -96,14 +110,20 @@ impl Mod {
         match &i.content {
             // Parse inner mod
             Some((_, items)) => {
-                let mut new_mod =
-                    Mod::new([self.path.to_vec(), vec![i.ident.to_string()]].concat());
+                let mut new_mod = Self::new(
+                    self.dir.to_owned(),
+                    [self.path.to_vec(), vec![i.ident.to_string()]].concat(),
+                    ModType::Internal,
+                );
                 new_mod.visit_items(items);
                 self.mods.push(new_mod);
             }
             // Parse file mod
             None => {
-                self.neighbors.push(i.ident.to_string());
+                self.mods.push(Self::parse(
+                    self.dir.join(i.ident.to_string()),
+                    &[self.path.to_vec(), vec![i.ident.to_string()]].concat(),
+                ));
             }
         }
     }
@@ -112,8 +132,8 @@ impl Mod {
     fn visit_item_use(&mut self, i: &syn::ItemUse) {
         let mut uses = self.visit_use_tree(&i.tree, &mut Vec::new(), Vec::new());
         match i.vis {
-            syn::Visibility::Public(_) => &mut self.pub_symbols,
-            syn::Visibility::Restricted(_) | syn::Visibility::Inherited => &mut self.pri_symbols,
+            syn::Visibility::Public(_) => &mut self.pub_uses,
+            syn::Visibility::Restricted(_) | syn::Visibility::Inherited => &mut self.pri_uses,
         }
         .append(&mut uses);
     }
@@ -159,7 +179,7 @@ impl Mod {
     ) -> Vec<Symbol> {
         items.push(Symbol {
             ident: i.ident.to_string(),
-            alias: [path.to_owned(), vec![i.ident.to_string()]].concat(),
+            path: [path.to_owned(), vec![i.ident.to_string()]].concat(),
         });
         items
     }
@@ -172,7 +192,7 @@ impl Mod {
     ) -> Vec<Symbol> {
         items.push(Symbol {
             ident: i.rename.to_string(),
-            alias: [path.to_owned(), vec![i.ident.to_string()]].concat(),
+            path: [path.to_owned(), vec![i.ident.to_string()]].concat(),
         });
         items
     }
@@ -186,7 +206,7 @@ impl Mod {
         // TODO: wtf
         items.push(Symbol {
             ident: "*".to_string(),
-            alias: [path.to_owned(), vec!["*".to_string()]].concat(),
+            path: [path.to_owned(), vec!["*".to_string()]].concat(),
         });
         items
     }
@@ -200,5 +220,14 @@ impl Mod {
         i.items
             .iter()
             .fold(items, |items, i| self.visit_use_tree(i, path, items))
+    }
+}
+
+impl Visited for Mod {
+    fn visit<V>(&mut self, vis: &mut V)
+    where
+        V: crate::ast_visitor::Visitor + ?Sized,
+    {
+        todo!()
     }
 }

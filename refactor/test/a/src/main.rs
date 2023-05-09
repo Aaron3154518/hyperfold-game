@@ -1,7 +1,7 @@
 use b;
 use c;
 
-const T1: u8 = 0;
+pub const T1: u8 = 0;
 static T2: u8 = 0;
 pub trait T3 {}
 type T4 = u8;
@@ -14,6 +14,8 @@ enum T8 {}
 
 mod a1;
 mod a2;
+
+use a2 as a22;
 
 fn main() {
     println!("Hello, world!");
