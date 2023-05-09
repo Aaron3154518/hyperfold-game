@@ -40,13 +40,13 @@ pub fn resolve_mod(
         }
     }
     // Check symbols
-    for sym in m.pub_symbols.iter() {
+    for sym in m.symbols.iter().filter(|sym| sym.public) {
         if sym.ident == name {
             return Some(sym.path.to_vec());
         }
     }
     // Check use statements
-    for sym in m.pub_uses.iter() {
+    for sym in m.uses.iter().filter(|sym| sym.public) {
         // Glob
         if sym.ident == "*" {
             let mut path = [sym.path.to_vec(), path[idx..].to_vec()].concat();
@@ -75,20 +75,18 @@ pub fn resolve_local_path(
     let name = path
         .first()
         .catch(format!("Empty resolve path: {}", path.join("::")));
-    [&m.pub_symbols, &m.pri_symbols, &m.pub_uses, &m.pri_uses]
-        .iter()
-        .find_map(|syns| {
-            syns.iter().find_map(|syn| {
-                // Get possible path
-                if syn.ident == "*" {
-                    Some([syn.path.to_vec(), path.to_vec()].concat())
-                } else {
-                    (name == &syn.ident).then_some([syn.path.to_vec(), path[1..].to_vec()].concat())
-                }
-                .and_then(|mut poss_path| {
-                    // Test each path
-                    resolve(&mut poss_path, crates)
-                })
+    [&m.symbols, &m.uses].iter().find_map(|syns| {
+        syns.iter().find_map(|syn| {
+            // Get possible path
+            if syn.ident == "*" {
+                Some([syn.path.to_vec(), path.to_vec()].concat())
+            } else {
+                (name == &syn.ident).then_some([syn.path.to_vec(), path[1..].to_vec()].concat())
+            }
+            .and_then(|mut poss_path| {
+                // Test each path
+                resolve(&mut poss_path, crates)
             })
         })
+    })
 }

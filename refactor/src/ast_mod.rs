@@ -8,6 +8,7 @@ use crate::util::{end, Expect};
 pub struct Symbol {
     pub ident: String,
     pub path: Vec<String>,
+    pub public: bool,
 }
 
 #[derive(Debug)]
@@ -25,10 +26,8 @@ pub struct Mod {
     pub dir: PathBuf,
     pub path: Vec<String>,
     pub mods: Vec<Mod>,
-    pub pub_symbols: Vec<Symbol>,
-    pub pri_symbols: Vec<Symbol>,
-    pub pub_uses: Vec<Symbol>,
-    pub pri_uses: Vec<Symbol>,
+    pub symbols: Vec<Symbol>,
+    pub uses: Vec<Symbol>,
 }
 
 impl Mod {
@@ -38,10 +37,8 @@ impl Mod {
             dir,
             path,
             mods: Vec::new(),
-            pub_symbols: Vec::new(),
-            pri_symbols: Vec::new(),
-            pub_uses: Vec::new(),
-            pri_uses: Vec::new(),
+            symbols: Vec::new(),
+            uses: Vec::new(),
         }
     }
 
@@ -67,6 +64,8 @@ impl Mod {
     fn visit_item(&mut self, i: &syn::Item) {
         // Match once to add to symbol table
         if let Some((ident, vis)) = match i {
+            // Use statements need to be parsed
+            syn::Item::Use(i) => None,
             // Add to symbol table
             syn::Item::Fn(i) => Some((&i.sig.ident, &i.vis)),
             syn::Item::Mod(syn::ItemMod { ident, vis, .. })
@@ -79,8 +78,7 @@ impl Mod {
             | syn::Item::TraitAlias(syn::ItemTraitAlias { ident, vis, .. })
             | syn::Item::Type(syn::ItemType { ident, vis, .. })
             | syn::Item::Union(syn::ItemUnion { ident, vis, .. }) => Some((ident, vis)),
-            // Use statements need to be parsed
-            syn::Item::Use(i) => None,
+
             // Ignore completely
             syn::Item::ForeignMod(..)
             | syn::Item::Impl(..)
@@ -89,15 +87,13 @@ impl Mod {
             | _ => None,
         } {
             // Add to the symbol table
-            match vis {
-                syn::Visibility::Public(_) => &mut self.pub_symbols,
-                syn::Visibility::Restricted(_) | syn::Visibility::Inherited => {
-                    &mut self.pri_symbols
-                }
-            }
-            .push(Symbol {
+            self.symbols.push(Symbol {
                 ident: ident.to_string(),
                 path: [self.path.to_owned(), vec![ident.to_string()]].concat(),
+                public: match vis {
+                    syn::Visibility::Public(_) => true,
+                    syn::Visibility::Restricted(_) | syn::Visibility::Inherited => false,
+                },
             })
         }
 
@@ -138,11 +134,12 @@ impl Mod {
     // Use paths
     fn visit_item_use(&mut self, i: &syn::ItemUse) {
         let mut uses = self.visit_use_tree(&i.tree, &mut Vec::new(), Vec::new());
-        match i.vis {
-            syn::Visibility::Public(_) => &mut self.pub_uses,
-            syn::Visibility::Restricted(_) | syn::Visibility::Inherited => &mut self.pri_uses,
-        }
-        .append(&mut uses);
+        let public = match i.vis {
+            syn::Visibility::Public(_) => true,
+            syn::Visibility::Restricted(_) | syn::Visibility::Inherited => false,
+        };
+        uses.iter_mut().for_each(|u| u.public = public);
+        self.uses.append(&mut uses);
     }
 
     fn visit_use_tree(
@@ -187,6 +184,7 @@ impl Mod {
         items.push(Symbol {
             ident: i.ident.to_string(),
             path: [path.to_owned(), vec![i.ident.to_string()]].concat(),
+            public: false,
         });
         items
     }
@@ -200,6 +198,7 @@ impl Mod {
         items.push(Symbol {
             ident: i.rename.to_string(),
             path: [path.to_owned(), vec![i.ident.to_string()]].concat(),
+            public: false,
         });
         items
     }
@@ -213,6 +212,7 @@ impl Mod {
         items.push(Symbol {
             ident: "*".to_string(),
             path: path.to_owned(),
+            public: false,
         });
         items
     }
