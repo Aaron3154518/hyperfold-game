@@ -36,7 +36,7 @@ impl From<DirType> for ModType {
 }
 
 impl Mod {
-    pub fn parse(path: PathBuf, mods: &Vec<String>) -> Self {
+    pub fn parse_mod(path: PathBuf, mods: &Vec<String>) -> Self {
         if path.is_dir() {
             Self::parse_dir(path, mods, DirType::Mod)
         } else {
@@ -51,14 +51,8 @@ impl Mod {
     }
 
     pub fn parse_file(dir: PathBuf, path: PathBuf, mods: &Vec<String>, ty: ModType) -> Self {
-        let file_contents = fs::read_to_string(path.to_owned())
-            .catch(format!("Failed to read file: {}", path.display()));
-        let ast = syn::parse_file(&file_contents).catch(format!(
-            "Failed to parse file contents of: {}",
-            path.display()
-        ));
         let mut file_mod = Self::new(dir, mods.to_vec(), ty);
-        file_mod.visit_file(&ast);
+        file_mod.parse(path);
         file_mod
     }
 

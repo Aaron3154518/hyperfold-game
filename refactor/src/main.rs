@@ -18,10 +18,12 @@ fn main() {
         vec!["crate", "a1", "A"],
         vec!["crate", "a2", "a5", "HEY"],
         vec!["crate", "a22", "a5", "HEY"],
-        vec!["crate", "a2", "a2", "HashMap"],
-        vec!["crate", "a2", "a2", "PartialEq"],
+        vec!["crate", "a22", "a2", "a5", "HEY"],
         vec!["crate", "a2", "a3", "A", "A1"],
+        vec!["crate", "a2", "a3", "A", "A2"],
         vec!["crate", "a2", "a3", "B", "A2"],
+        vec!["crate", "a2", "a3", "A3", "A1"],
+        vec!["crate", "a2", "a2", "A3", "A1"],
     ] {
         println!(
             "{}\n{:#?}",

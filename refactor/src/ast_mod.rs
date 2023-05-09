@@ -48,6 +48,16 @@ impl Mod {
         }
     }
 
+    pub fn parse(&mut self, path: PathBuf) {
+        let file_contents = fs::read_to_string(path.to_owned())
+            .catch(format!("Failed to read file: {}", path.display()));
+        let ast = syn::parse_file(&file_contents).catch(format!(
+            "Failed to parse file contents of: {}",
+            path.display()
+        ));
+        self.visit_file(&ast);
+    }
+
     // File/items
     pub fn visit_file(&mut self, i: &syn::File) {
         self.visit_items(&i.items);
@@ -120,7 +130,7 @@ impl Mod {
             }
             // Parse file mod
             None => {
-                self.mods.push(Self::parse(
+                self.mods.push(Self::parse_mod(
                     self.dir.join(i.ident.to_string()),
                     &[self.path.to_vec(), vec![i.ident.to_string()]].concat(),
                 ));
@@ -203,10 +213,9 @@ impl Mod {
         path: &mut Vec<String>,
         mut items: Vec<Symbol>,
     ) -> Vec<Symbol> {
-        // TODO: wtf
         items.push(Symbol {
             ident: "*".to_string(),
-            path: [path.to_owned(), vec!["*".to_string()]].concat(),
+            path: path.to_owned(),
         });
         items
     }

@@ -13,9 +13,9 @@ pub fn T7() {}
 enum T8 {}
 
 mod a1;
-mod a2;
+pub mod a2;
 
-use a2 as a22;
+pub use a2 as a22;
 
 fn main() {
     println!("Hello, world!");
