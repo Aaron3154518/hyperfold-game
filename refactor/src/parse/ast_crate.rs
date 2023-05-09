@@ -11,6 +11,7 @@ use crate::util::Expect;
 
 #[derive(Debug)]
 pub struct Crate {
+    pub idx: usize,
     pub name: String,
     pub dir: PathBuf,
     pub main: Mod,
@@ -18,7 +19,7 @@ pub struct Crate {
 }
 
 impl Crate {
-    pub fn new(dir: PathBuf, is_entry: bool) -> Self {
+    pub fn new(dir: PathBuf, idx: usize, is_entry: bool) -> Self {
         let err_dir = dir.to_owned();
         let dir: PathBuf = fs::canonicalize(dir).catch(format!(
             "Could not canonicalize path: {}",
@@ -26,14 +27,12 @@ impl Crate {
         ));
 
         Self {
-            name: if is_entry {
-                "crate".to_string()
-            } else {
-                dir.file_name()
-                    .catch(format!("Could not parse file name: {}", err_dir.display()))
-                    .to_string_lossy()
-                    .to_string()
-            },
+            idx,
+            name: dir
+                .file_name()
+                .catch(format!("Could not parse file name: {}", err_dir.display()))
+                .to_string_lossy()
+                .to_string(),
             dir: dir.to_owned(),
             main: Mod::parse_dir(
                 dir.join("src"),
@@ -49,7 +48,7 @@ impl Crate {
     }
 
     pub fn parse(mut dir: PathBuf) -> Vec<Self> {
-        let mut crates = vec![Crate::new(dir.to_owned(), true)];
+        let mut crates = vec![Crate::new(dir.to_owned(), 0, true)];
 
         let mut i = 0;
         while i < crates.len() {
@@ -75,7 +74,7 @@ impl Crate {
                 })
                 .collect::<HashMap<_, _>>();
             for path in new_deps {
-                crates.push(Crate::new(cr_dir.join(path), false))
+                crates.push(Crate::new(cr_dir.join(path), crates.len(), false))
             }
             i += 1;
         }

@@ -24,11 +24,16 @@ fn main() {
         vec!["crate", "a2", "a3", "B", "A2"],
         vec!["crate", "a2", "a3", "A3", "A1"],
         vec!["crate", "a2", "a2", "A3", "A1"],
+        vec!["macros", "component"],
     ] {
         println!(
             "{}\n{:#?}",
             v.join("::"),
-            ast_resolve::resolve(&mut v.iter().map(|s| s.to_string()).collect(), &crates)
+            ast_resolve::resolve(
+                v.iter().map(|s| s.to_string()).collect(),
+                &crates[0],
+                &crates
+            )
         )
     }
     let items = crates

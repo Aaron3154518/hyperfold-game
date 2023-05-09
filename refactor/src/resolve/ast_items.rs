@@ -58,10 +58,10 @@ impl ItemsCrate {
     }
 
     pub fn parse_crate(&mut self, cr: &Crate, crates: &Vec<Crate>) {
-        self.parse_mod(&cr.main, crates)
+        self.parse_mod(cr, &cr.main, crates)
     }
 
-    pub fn parse_mod(&mut self, m: &Mod, crates: &Vec<Crate>) {
+    pub fn parse_mod(&mut self, cr: &Crate, m: &Mod, crates: &Vec<Crate>) {
         let dep_path = vec!["macros".to_string(), "dependency".to_string()];
         for mi in m.marked.iter() {
             match mi.ty {
@@ -71,9 +71,9 @@ impl ItemsCrate {
                 crate::parse::ast_mod::MarkType::Use => {
                     for (path, args) in mi.attrs.iter() {
                         println!("{}", path.join("::"));
-                        let match_path = resolve_local_path(&mut path.to_vec(), m, crates).get();
-                        println!("{}", match_path.join("::"));
-                        if match_path == dep_path {
+                        let match_path = resolve_local_path(path.to_vec(), cr, m, crates).get();
+                        println!("{}, {}", match_path.cr_idx, match_path.path.join("::"));
+                        if match_path.path == dep_path {
                             println!("Dep: {:#?}", mi.sym.path.last());
                             self.dependencies.push(Dependency {
                                 name: mi
@@ -89,6 +89,6 @@ impl ItemsCrate {
                 }
             }
         }
-        m.mods.iter().for_each(|m| self.parse_mod(m, crates));
+        m.mods.iter().for_each(|m| self.parse_mod(cr, m, crates));
     }
 }
