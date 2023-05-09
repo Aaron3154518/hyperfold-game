@@ -25,6 +25,7 @@ fn main() {
         vec!["crate", "a2", "a3", "A3", "A1"],
         vec!["crate", "a2", "a2", "A3", "A1"],
         vec!["macros", "component"],
+        vec!["crate", "component"],
     ] {
         println!(
             "{}\n{:#?}",

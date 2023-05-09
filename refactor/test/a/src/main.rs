@@ -18,6 +18,8 @@ pub mod a2;
 
 pub use a2 as a22;
 
+pub use a2::a3::B::comp as component;
+
 fn main() {
     println!("Hello, world!");
 }

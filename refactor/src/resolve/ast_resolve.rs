@@ -13,6 +13,7 @@ pub struct Path {
 }
 
 pub fn resolve(path: Vec<String>, cr: &Crate, crates: &Vec<Crate>) -> Result<Path, Path> {
+    // println!("Resolve: {}", path.join("::"));
     let cr_idx = cr.idx;
     match path.first() {
         Some(p) => {
@@ -40,6 +41,11 @@ pub fn resolve_mod(
     m: &Mod,
     crates: &Vec<Crate>,
 ) -> Result<Path, Path> {
+    // println!(
+    //     "Resolve Mod: {} at {}",
+    //     path.join("::"),
+    //     path.get(idx).unwrap_or(&"None".to_string())
+    // );
     let cr_idx = cr.idx;
 
     // Ran out of stuff to parse
@@ -58,12 +64,14 @@ pub fn resolve_mod(
     // Check sub modules
     for m in m.mods.iter() {
         if name == *m.path.last().expect("Mod path is empty") {
+            // println!("Found Mod: {}", name);
             return resolve_mod(path, idx + 1, cr, m, crates);
         }
     }
     // Check symbols
     for sym in m.symbols.iter().filter(|sym| sym.public) {
         if sym.ident == name {
+            // println!("Found Symbol: {}", sym.path.join("::"));
             return Ok(Path {
                 cr_idx: cr.idx,
                 path: sym.path.to_vec(),
@@ -71,7 +79,7 @@ pub fn resolve_mod(
         }
     }
     // Check use statements
-    for sym in m.uses.iter().filter(|sym| sym.public) {
+    for sym in m.uses.iter() {
         // Glob - this is allowed to fail
         if sym.ident == "*" {
             let path = [sym.path.to_vec(), path[idx..].to_vec()].concat();
@@ -83,6 +91,7 @@ pub fn resolve_mod(
         // Use
         } else if sym.ident == name {
             let path = [sym.path.to_vec(), path[idx + 1..].to_vec()].concat();
+            // println!("Matched Use: {}", sym.path.join("::"));
             return resolve_local_path(path.to_vec(), cr, m, crates)
                 .or_else(|e| resolve(path, cr, crates));
         }
@@ -97,10 +106,19 @@ pub fn resolve_local_path(
     m: &Mod,
     crates: &Vec<Crate>,
 ) -> Result<Path, Path> {
-    // Get possible paths
+    // println!("Local Resolve: {}", path.join("::"));
+    let cr_idx = cr.idx;
+
     let name = path
         .first()
         .catch(format!("Empty resolve path: {}", path.join("::")));
+
+    // Can't be local
+    if name == "crate" {
+        return Err(Path { cr_idx, path });
+    }
+
+    // Iterate possible paths
     [&m.symbols, &m.uses]
         .iter()
         .find_map(|syns| {
@@ -117,10 +135,5 @@ pub fn resolve_local_path(
                 })
             })
         })
-        .unwrap_or_else(|| {
-            Err(Path {
-                cr_idx: cr.idx,
-                path,
-            })
-        })
+        .unwrap_or_else(|| Err(Path { cr_idx, path }))
 }

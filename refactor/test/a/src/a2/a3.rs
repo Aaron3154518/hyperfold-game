@@ -11,8 +11,11 @@ pub mod A {
     }
 }
 
-mod B {
+use macros as mac;
+
+pub mod B {
     use super::hash::Hash;
+    pub use super::mac::component as comp;
     pub use super::A;
     pub use A::A1 as A2;
     struct B;
