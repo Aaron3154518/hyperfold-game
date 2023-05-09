@@ -1,7 +1,6 @@
 use crate::{
     ast_crate::Crate,
     ast_mod::{Mod, Symbol},
-    ast_visitor::{Visited, Visitor},
     util::Expect,
 };
 

@@ -4,7 +4,6 @@ use syn::visit::Visit;
 
 use crate::{
     ast_mod::{Mod, ModType},
-    ast_visitor::Visited,
     util::Expect,
 };
 

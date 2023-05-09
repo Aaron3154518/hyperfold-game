@@ -1,6 +1,6 @@
 use std::{fs, path::PathBuf};
 
-use crate::{ast_file::DirType, ast_mod::Mod, ast_visitor::Visited, util::Expect};
+use crate::{ast_file::DirType, ast_mod::Mod, util::Expect};
 
 #[derive(Debug)]
 pub struct Crate {
@@ -36,26 +36,6 @@ impl Crate {
                     DirType::Lib
                 },
             ),
-        }
-    }
-}
-
-impl Visited for Crate {
-    fn visit<V>(&mut self, vis: &mut V)
-    where
-        V: crate::ast_visitor::Visitor + ?Sized,
-    {
-        vis.visit_mod(&mut self.main)
-    }
-}
-
-impl Visited for Vec<Crate> {
-    fn visit<V>(&mut self, vis: &mut V)
-    where
-        V: crate::ast_visitor::Visitor + ?Sized,
-    {
-        for cr in self.iter_mut() {
-            vis.visit_crate(cr)
         }
     }
 }

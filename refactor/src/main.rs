@@ -7,7 +7,6 @@ mod ast_crate;
 mod ast_file;
 mod ast_mod;
 mod ast_use;
-mod ast_visitor;
 mod util;
 
 fn main() {

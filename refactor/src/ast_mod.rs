@@ -2,10 +2,7 @@ use std::{fs, path::PathBuf};
 
 use syn::visit::Visit;
 
-use crate::{
-    ast_visitor::Visited,
-    util::{end, Expect},
-};
+use crate::util::{end, Expect};
 
 #[derive(Debug)]
 pub struct Symbol {
@@ -229,14 +226,5 @@ impl Mod {
         i.items
             .iter()
             .fold(items, |items, i| self.visit_use_tree(i, path, items))
-    }
-}
-
-impl Visited for Mod {
-    fn visit<V>(&mut self, vis: &mut V)
-    where
-        V: crate::ast_visitor::Visitor + ?Sized,
-    {
-        todo!()
     }
 }
