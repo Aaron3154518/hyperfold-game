@@ -6,7 +6,6 @@ use crate::{
 };
 
 pub fn resolve(path: &mut Vec<String>, crates: &Vec<Crate>) -> Option<Vec<String>> {
-    println!("{}", path.join("::"));
     for cr in crates.iter() {
         if path.get(0).is_some_and(|s| *s == cr.name) {
             return resolve_mod(path, 1, &cr.main, crates);
@@ -51,56 +50,46 @@ pub fn resolve_mod(
     for sym in m.pub_uses.iter() {
         // Glob
         if sym.ident == "*" {
-            if let Some(v) = resolve(
-                &mut [sym.path.to_vec(), path[idx..].to_vec()].concat(),
-                crates,
-            ) {
+            let mut path = [sym.path.to_vec(), path[idx..].to_vec()].concat();
+            if let Some(v) = resolve(&mut path.to_vec(), crates)
+                .or_else(|| resolve_local_path(&mut path, m, crates))
+            {
                 return Some(v);
             }
         // Use
         } else if sym.ident == name {
-            return resolve(
-                &mut [sym.path.to_vec(), path[idx + 1..].to_vec()].concat(),
-                crates,
-            );
+            let mut path = [sym.path.to_vec(), path[idx + 1..].to_vec()].concat();
+            return resolve(&mut path.to_vec(), crates)
+                .or_else(|| resolve_local_path(&mut path, m, crates));
         }
     }
     None
 }
 
-// pub fn resolve(cr: &Crate, crates: &Vec<Crate>) {
-//     resolve_file(&cr.file, crates)
-// }
-
-// pub fn resolve_file(f: &FileType, crates: &Vec<Crate>) {
-//     match &f {
-//         crate::ast_file::FileType::File(f) => resolve_mod(&f.file_mod, crates),
-//         crate::ast_file::FileType::Dir(d) => {
-//             d.children.iter().for_each(|f| resolve_file(f, crates))
-//         }
-//     }
-// }
-
-// pub fn resolve_mod(m: &Mod, crates: &Vec<Crate>) {
-//     for sym in m.pub_uses.iter() {
-//         let res_sym = ResolveUsePath {
-//             path: sym.alias.to_vec(),
-//         }
-//         .resolve(crates);
-//     }
-// }
-
-// impl Visitor for ResolveUsePath {
-//     fn visit_crates(&mut self, v: &mut Vec<crate::ast_crate::Crate>) {
-//         for cr in v.iter_mut() {
-//             // TODO: Check that this crate is a dependency
-//             if self.path.last().is_some_and(|s| *s == cr.name) {
-//                 self.path.pop();
-//                 v.visit(cr);
-//                 break;
-//             }
-//         }
-//     }
-
-//     fn visit_mod(&mut self, v: &mut crate::ast_mod::Mod) {}
-// }
+// Paths that start relative to some mod item
+pub fn resolve_local_path(
+    path: &mut Vec<String>,
+    m: &Mod,
+    crates: &Vec<Crate>,
+) -> Option<Vec<String>> {
+    // Get possible paths
+    let name = path
+        .first()
+        .catch(format!("Empty resolve path: {}", path.join("::")));
+    [&m.pub_symbols, &m.pri_symbols, &m.pub_uses, &m.pri_uses]
+        .iter()
+        .find_map(|syns| {
+            syns.iter().find_map(|syn| {
+                // Get possible path
+                if syn.ident == "*" {
+                    Some([syn.path.to_vec(), path.to_vec()].concat())
+                } else {
+                    (name == &syn.ident).then_some([syn.path.to_vec(), path[1..].to_vec()].concat())
+                }
+                .and_then(|mut poss_path| {
+                    // Test each path
+                    resolve(&mut poss_path, crates)
+                })
+            })
+        })
+}
