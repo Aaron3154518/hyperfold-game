@@ -3,6 +3,7 @@ use std::hash;
 pub mod A {
     pub use super::B::A as A1;
     pub use A as A2;
+    #[super::mac::global]
     pub struct A;
     impl A {
         pub fn foo(&self) {

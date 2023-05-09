@@ -6,7 +6,7 @@ use crate::parse::{
 };
 use crate::util::Expect;
 
-#[derive(Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct Path {
     pub cr_idx: usize,
     pub path: Vec<String>,
@@ -83,24 +83,21 @@ pub fn resolve_mod(
         // Glob - this is allowed to fail
         if sym.ident == "*" {
             let path = [sym.path.to_vec(), path[idx..].to_vec()].concat();
-            if let Ok(v) = resolve_local_path(path.to_vec(), cr, m, crates)
-                .or_else(|e| resolve(path, cr, crates))
-            {
+            if let Ok(v) = resolve_path(path.to_vec(), cr, m, crates) {
                 return Ok(v);
             }
         // Use
         } else if sym.ident == name {
             let path = [sym.path.to_vec(), path[idx + 1..].to_vec()].concat();
             // println!("Matched Use: {}", sym.path.join("::"));
-            return resolve_local_path(path.to_vec(), cr, m, crates)
-                .or_else(|e| resolve(path, cr, crates));
+            return resolve_path(path.to_vec(), cr, m, crates);
         }
     }
     Err(Path { cr_idx, path })
 }
 
 // Paths that start relative to some mod item
-pub fn resolve_local_path(
+pub fn resolve_path(
     path: Vec<String>,
     cr: &Crate,
     m: &Mod,
@@ -115,7 +112,7 @@ pub fn resolve_local_path(
 
     // Can't be local
     if name == "crate" {
-        return Err(Path { cr_idx, path });
+        return resolve(path, cr, crates);
     }
 
     // Iterate possible paths
@@ -125,15 +122,18 @@ pub fn resolve_local_path(
             syns.iter().find_map(|syn| {
                 // Get possible path
                 if syn.ident == "*" {
-                    Some([syn.path.to_vec(), path.to_vec()].concat())
+                    resolve([syn.path.to_vec(), path.to_vec()].concat(), cr, crates)
+                        .map_or(None, |p| Some(Ok(p)))
+                } else if name == &syn.ident {
+                    Some(resolve(
+                        [syn.path.to_vec(), path[1..].to_vec()].concat(),
+                        cr,
+                        crates,
+                    ))
                 } else {
-                    (name == &syn.ident).then_some([syn.path.to_vec(), path[1..].to_vec()].concat())
+                    None
                 }
-                .and_then(|poss_path| {
-                    // Test each path
-                    Some(resolve(poss_path, cr, crates))
-                })
             })
         })
-        .unwrap_or_else(|| Err(Path { cr_idx, path }))
+        .unwrap_or_else(|| resolve(path, cr, crates))
 }

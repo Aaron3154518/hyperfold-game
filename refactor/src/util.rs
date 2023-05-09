@@ -33,3 +33,21 @@ impl<T> Get<T> for Result<T, T> {
 pub fn end<T>(v: &Vec<T>, off: usize) -> usize {
     v.len().max(off) - off
 }
+
+// Manage use statements
+pub fn parse_use(parent_path: &Vec<String>, use_path: &Vec<String>) -> Vec<String> {
+    let mut path = Vec::new();
+    for p in use_path {
+        match p.as_str() {
+            "super" => {
+                if path.is_empty() {
+                    path = parent_path[..end(parent_path, 1)].to_vec();
+                } else {
+                    path.pop();
+                }
+            }
+            _ => path.push(p.to_string()),
+        }
+    }
+    path
+}

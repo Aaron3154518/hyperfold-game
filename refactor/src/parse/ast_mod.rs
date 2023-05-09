@@ -12,7 +12,6 @@ pub enum MarkType {
     Struct,
     Fn,
     Enum,
-    Use,
 }
 
 // TODO: Cfg features
@@ -145,7 +144,7 @@ impl Mod {
 
     // Mod
     fn visit_item_mod(&mut self, i: &syn::ItemMod) {
-        if let Some(attrs) = get_attributes_if_active(&i.attrs, &Vec::new()) {
+        if let Some(attrs) = get_attributes_if_active(&i.attrs, &self.path, &Vec::new()) {
             match &i.content {
                 // Parse inner mod
                 Some((_, items)) => {
@@ -170,7 +169,7 @@ impl Mod {
 
     // Components
     fn visit_item_struct(&mut self, i: &syn::ItemStruct) {
-        if let Some(attrs) = get_attributes_if_active(&i.attrs, &Vec::new()) {
+        if let Some(attrs) = get_attributes_if_active(&i.attrs, &self.path, &Vec::new()) {
             if !attrs.is_empty() {
                 self.marked.push(MarkedItem {
                     ty: MarkType::Struct,
@@ -183,7 +182,7 @@ impl Mod {
 
     // Systems
     fn visit_item_fn(&mut self, i: &syn::ItemFn) {
-        if let Some(attrs) = get_attributes_if_active(&i.attrs, &Vec::new()) {
+        if let Some(attrs) = get_attributes_if_active(&i.attrs, &self.path, &Vec::new()) {
             if !attrs.is_empty() {
                 self.marked.push(MarkedItem {
                     ty: MarkType::Fn,
@@ -196,7 +195,7 @@ impl Mod {
 
     // Events
     fn visit_item_enum(&mut self, i: &syn::ItemEnum) {
-        if let Some(attrs) = get_attributes_if_active(&i.attrs, &Vec::new()) {
+        if let Some(attrs) = get_attributes_if_active(&i.attrs, &self.path, &Vec::new()) {
             if !attrs.is_empty() {
                 self.marked.push(MarkedItem {
                     ty: MarkType::Enum,
@@ -209,26 +208,13 @@ impl Mod {
 
     // Use paths
     fn visit_item_use(&mut self, i: &syn::ItemUse) {
-        if let Some(attrs) = get_attributes_if_active(&i.attrs, &Vec::new()) {
+        if let Some(attrs) = get_attributes_if_active(&i.attrs, &self.path, &Vec::new()) {
             let mut uses = self.visit_use_tree(&i.tree, &mut Vec::new(), Vec::new());
             let public = match i.vis {
                 syn::Visibility::Public(_) => true,
                 syn::Visibility::Restricted(_) | syn::Visibility::Inherited => false,
             };
             uses.iter_mut().for_each(|u| u.public = public);
-            if !attrs.is_empty() {
-                // Add marked
-                self.marked.append(
-                    &mut uses
-                        .iter()
-                        .map(|sym| MarkedItem {
-                            ty: MarkType::Use,
-                            sym: sym.to_owned(),
-                            attrs: attrs.to_vec(),
-                        })
-                        .collect::<Vec<_>>(),
-                );
-            }
             self.uses.append(&mut uses);
         }
     }

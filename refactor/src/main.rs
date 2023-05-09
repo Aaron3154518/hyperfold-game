@@ -1,5 +1,9 @@
 #![allow(unused)]
-use std::{fs::File, io::Read, path::PathBuf};
+use std::{
+    fs::{self, File},
+    io::Read,
+    path::PathBuf,
+};
 
 use parse::ast_crate::Crate;
 use resolve::ast_resolve;
@@ -10,9 +14,7 @@ mod parse;
 mod resolve;
 mod util;
 
-fn main() {
-    let crates = Crate::parse(PathBuf::from("test/a"));
-    println!("{:#?}", crates);
+fn test_resolves(crates: &Vec<Crate>) {
     for v in [
         vec!["crate", "T1"],
         vec!["crate", "a1", "A"],
@@ -26,6 +28,7 @@ fn main() {
         vec!["crate", "a2", "a2", "A3", "A1"],
         vec!["macros", "component"],
         vec!["crate", "component"],
+        vec!["crate", "a2", "a3", "mac", "global"],
     ] {
         println!(
             "{}\n{:#?}",
@@ -37,11 +40,23 @@ fn main() {
             )
         )
     }
+}
+
+fn main() {
+    let engine_dir =
+        fs::canonicalize(PathBuf::from("macros")).expect("Could not canonicalize engine path");
+    let crates = Crate::parse(PathBuf::from("test/a"));
+    let engine_crate = crates
+        .iter()
+        .find(|cr| cr.dir == engine_dir)
+        .expect("Could not find engine crate. Please include it");
+    println!("{:#?}", crates);
+    // test_resolves(&crates);
     let items = crates
         .iter()
         .map(|cr| {
             let mut ic = ItemsCrate::new();
-            ic.parse_crate(cr, &crates);
+            ic.parse_crate(cr, engine_crate, &crates);
             ic
         })
         .collect::<Vec<_>>();

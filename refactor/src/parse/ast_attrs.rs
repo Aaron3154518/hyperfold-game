@@ -1,6 +1,8 @@
 use parse_cfg::Cfg;
 use quote::ToTokens;
 
+use crate::util::parse_use;
+
 // Parse attributes from engine components
 #[derive(Copy, Clone, Debug)]
 pub enum EcsAttribute {
@@ -8,7 +10,6 @@ pub enum EcsAttribute {
     Global,
     System,
     Event,
-    Dependency,
 }
 
 impl EcsAttribute {
@@ -18,7 +19,6 @@ impl EcsAttribute {
             "global" => Some(EcsAttribute::Global),
             "system" => Some(EcsAttribute::System),
             "event" => Some(EcsAttribute::Event),
-            "dependency" => Some(EcsAttribute::Dependency),
             _ => None,
         }
     }
@@ -41,10 +41,11 @@ impl Attribute {
 
 pub fn get_attributes_if_active(
     attrs: &Vec<syn::Attribute>,
+    path: &Vec<String>,
     features: &Vec<String>,
 ) -> Option<Vec<(Vec<String>, Vec<String>)>> {
     let mut is_active = true;
-    let new_attrs = get_attributes(attrs)
+    let new_attrs = get_attributes(attrs, path)
         .into_iter()
         .fold(Vec::new(), |mut new_attrs, a| {
             match a {
@@ -59,18 +60,19 @@ pub fn get_attributes_if_active(
 }
 
 // Returns list of parsed attributes from ast attributes
-pub fn get_attributes(attrs: &Vec<syn::Attribute>) -> Vec<Attribute> {
+pub fn get_attributes(attrs: &Vec<syn::Attribute>, path: &Vec<String>) -> Vec<Attribute> {
     attrs
         .iter()
         .map(|a| {
             parse_attr_args(
-                Attribute::from(
-                    a.path()
+                Attribute::from(parse_use(
+                    path,
+                    &a.path()
                         .segments
                         .iter()
                         .map(|s| s.ident.to_string())
                         .collect(),
-                ),
+                )),
                 a,
             )
         })
