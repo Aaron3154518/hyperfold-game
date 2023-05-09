@@ -14,7 +14,7 @@ pub struct Crate {
     pub name: String,
     pub dir: PathBuf,
     pub main: Mod,
-    pub deps: HashMap<String, String>,
+    pub deps: HashMap<usize, String>,
 }
 
 impl Crate {
@@ -44,8 +44,43 @@ impl Crate {
                     DirType::Lib
                 },
             ),
-            deps: Self::parse_cargo_toml(dir),
+            deps: HashMap::new(),
         }
+    }
+
+    pub fn parse(mut dir: PathBuf) -> Vec<Self> {
+        let mut crates = vec![Crate::new(dir.to_owned(), true)];
+
+        let mut i = 0;
+        while i < crates.len() {
+            let cr_dir = crates[i].dir.to_owned();
+            let deps = Crate::parse_cargo_toml(cr_dir.to_owned());
+            let mut new_deps = Vec::new();
+            crates[i].deps = deps
+                .into_iter()
+                .map(|(name, path)| {
+                    let dep_dir = fs::canonicalize(cr_dir.join(path.to_string())).catch(format!(
+                        "Could not canonicalize dependency path: {}: {}/{}",
+                        name,
+                        cr_dir.display(),
+                        path
+                    ));
+                    match crates.iter().position(|cr| cr.dir == dep_dir) {
+                        Some(i) => (i, name),
+                        None => {
+                            new_deps.push(path);
+                            (crates.len() + new_deps.len() - 1, name)
+                        }
+                    }
+                })
+                .collect::<HashMap<_, _>>();
+            for path in new_deps {
+                crates.push(Crate::new(cr_dir.join(path), false))
+            }
+            i += 1;
+        }
+
+        crates
     }
 
     fn parse_cargo_toml(dir: PathBuf) -> HashMap<String, String> {
@@ -77,8 +112,8 @@ impl Crate {
             .expect("Could not convert 'dependencies' section to a table");
         deps.into_iter()
             .filter_map(|(k, v)| match v {
-                toml::Value::Table(t) => match t.get("path") {
-                    Some(toml::Value::String(p)) => Some((k.to_string(), p.to_string())),
+                toml::Value::Table(t) => match (t.get("path"), t.get("dependency")) {
+                    (Some(toml::Value::String(p)), Some(_)) => Some((k.to_string(), p.to_string())),
                     _ => None,
                 },
                 _ => None,

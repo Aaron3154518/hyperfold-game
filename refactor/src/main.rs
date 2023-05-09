@@ -11,7 +11,7 @@ mod resolve;
 mod util;
 
 fn main() {
-    let crates = vec![Crate::new(PathBuf::from("test/a"), true)];
+    let crates = Crate::parse(PathBuf::from("test/a"));
     println!("{:#?}", crates);
     for v in [
         vec!["crate", "T1"],

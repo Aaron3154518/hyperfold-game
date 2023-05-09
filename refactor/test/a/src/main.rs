@@ -1,8 +1,4 @@
-use macros::dependency;
-
-#[macros::dependency]
 use b as b2;
-#[dependency]
 use c;
 
 pub const T1: u8 = 0;
@@ -12,6 +8,7 @@ type T4 = u8;
 union T5 {
     i: u8,
 }
+#[macros::component]
 pub struct T6;
 pub fn T7() {}
 enum T8 {}

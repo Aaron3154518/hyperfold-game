@@ -6,6 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-b = { path= "./b" }
-c = { path= "./c" }
-macros = { path = "../../macros" }
+b = { path = "./b", dependency = "" }
+c = { path = "./c", dependency = "" }
+macros = { path = "../../macros", dependency = "" }
