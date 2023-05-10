@@ -1,3 +1,4 @@
+// Traits for calling except() with a String (i.e. with format!())
 pub trait Catch<T> {
     fn catch(self, err: String) -> T;
 }
@@ -17,6 +18,7 @@ where
     }
 }
 
+// Trait for getting the value of a Result regardless of Ok/Err
 pub trait Get<T> {
     fn get(self) -> T;
 }
@@ -26,6 +28,22 @@ impl<T> Get<T> for Result<T, T> {
         match self {
             Ok(t) | Err(t) => t,
         }
+    }
+}
+
+// Trait for mapping Vec elements to strings and joining them
+pub trait JoinMap<T> {
+    fn join_map<F>(&self, f: F, sep: &str) -> String
+    where
+        F: Fn(&T) -> String;
+}
+
+impl<T> JoinMap<T> for Vec<T> {
+    fn join_map<F>(&self, f: F, sep: &str) -> String
+    where
+        F: Fn(&T) -> String,
+    {
+        self.iter().map(f).collect::<Vec<_>>().join(sep)
     }
 }
 

@@ -45,6 +45,7 @@ impl syn::parse::Parse for ComponentMacroArgs {
 pub struct GlobalMacroArgs {
     pub is_dummy: bool,
     pub is_const: bool,
+    pub is_trait: bool,
 }
 
 impl From<Vec<String>> for GlobalMacroArgs {
@@ -52,6 +53,7 @@ impl From<Vec<String>> for GlobalMacroArgs {
         let mut g = Self {
             is_dummy: false,
             is_const: false,
+            is_trait: false,
         };
         for v in vals {
             match v.as_str() {

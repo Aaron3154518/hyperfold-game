@@ -8,11 +8,12 @@ use std::{
 use parse::ast_crate::Crate;
 use resolve::ast_resolve;
 
-use crate::resolve::ast_items::ItemsCrate;
+use crate::{resolve::ast_items::ItemsCrate, validate::ast_validate::ItemData};
 
 mod parse;
 mod resolve;
 mod util;
+mod validate;
 
 fn test_resolves(crates: &Vec<Crate>) {
     for v in [
@@ -51,7 +52,9 @@ fn main() {
         .find(|cr| cr.dir == engine_dir)
         .expect("Could not find engine crate. Please include it");
     // println!("{:#?}", crates);
+
     // test_resolves(&crates);
+
     let items = crates
         .iter()
         .map(|cr| {
@@ -60,5 +63,8 @@ fn main() {
             ic
         })
         .collect::<Vec<_>>();
-    println!("{:#?}", items);
+    // println!("{:#?}", items);
+
+    let data = ItemData::validate(&items);
+    println!("{:#?}", data);
 }
