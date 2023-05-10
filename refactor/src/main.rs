@@ -8,7 +8,10 @@ use std::{
 use parse::ast_crate::Crate;
 use resolve::ast_resolve;
 
-use crate::{resolve::ast_items::ItemsCrate, validate::ast_validate::ItemData};
+use crate::{
+    resolve::{ast_items::ItemsCrate, ast_paths::Paths},
+    validate::ast_validate::ItemData,
+};
 
 mod parse;
 mod resolve;
@@ -56,14 +59,17 @@ fn test_resolves(crates: &Vec<Crate>) {
 }
 
 fn main() {
+    let crates = Crate::parse(PathBuf::from("test/a"));
+    // println!("{:#?}", crates);
+
     let engine_dir =
         fs::canonicalize(PathBuf::from("engine")).expect("Could not canonicalize engine path");
-    let crates = Crate::parse(PathBuf::from("test/a"));
-    let engine_crate = crates
-        .iter()
-        .find(|cr| cr.dir == engine_dir)
-        .expect("Could not find engine crate. Please include it");
-    // println!("{:#?}", crates);
+    let paths = Paths::new(
+        crates
+            .iter()
+            .find_map(|cr| (cr.dir == engine_dir).then_some(cr.idx))
+            .expect("Could not find engine crate. Please include it"),
+    );
 
     // test_resolves(&crates);
 
@@ -71,12 +77,12 @@ fn main() {
         .iter()
         .map(|cr| {
             let mut ic = ItemsCrate::new();
-            ic.parse_crate(cr, engine_crate, &crates);
+            ic.parse_crate(cr, &paths, &crates);
             ic
         })
         .collect::<Vec<_>>();
     // println!("{:#?}", items);
 
-    let data = ItemData::validate(&mut items);
+    let data = ItemData::validate(&paths, &mut items);
     println!("{:#?}", data);
 }

@@ -24,7 +24,7 @@ impl std::fmt::Display for FnArgType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             FnArgType::Path(p) => f.write_str(p.path.join("::").as_str()),
-            FnArgType::Trait(p) => f.write_str(format!("impl {}", p.path.join("::")).as_str()),
+            FnArgType::Trait(p) => f.write_str(format!("dyn {}", p.path.join("::")).as_str()),
             FnArgType::Container(p, v) => f.write_str(
                 format!(
                     "{}<({})>",
@@ -48,6 +48,7 @@ pub struct FnArg {
     pub ty: FnArgType,
     pub ident: String,
     pub mutable: bool,
+    pub ref_cnt: usize,
 }
 
 impl FnArg {
@@ -56,6 +57,7 @@ impl FnArg {
             ty: FnArgType::Path(Path::new()),
             ident: String::new(),
             mutable: false,
+            ref_cnt: 0,
         }
     }
 
@@ -66,7 +68,7 @@ impl FnArg {
         self.parse_type(cr_idx, super_path, &arg.ty);
     }
 
-    pub fn parse_type(&mut self, cr_idx: usize, super_path: &Vec<String>, ty: &syn::Type) {
+    fn parse_type(&mut self, cr_idx: usize, super_path: &Vec<String>, ty: &syn::Type) {
         match ty {
             syn::Type::Path(p) => {
                 // Type container with generic tuple
@@ -116,6 +118,7 @@ impl FnArg {
                 }
             }
             syn::Type::Reference(r) => {
+                self.ref_cnt += 1;
                 self.mutable = r.mutability.is_some();
                 self.parse_type(cr_idx, super_path, &r.elem);
             }
@@ -162,12 +165,13 @@ impl std::fmt::Display for FnArg {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(
             format!(
-                "{}&{}{}",
+                "{}{}{}{}",
                 if self.ident.is_empty() {
                     String::new()
                 } else {
                     format!("{}: ", self.ident)
                 },
+                "&".repeat(self.ref_cnt),
                 if self.mutable { "mut " } else { "" },
                 self.ty
             )

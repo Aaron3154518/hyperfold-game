@@ -19,12 +19,21 @@ pub mod a2;
 pub use a2 as a22;
 
 pub use a2::a3::B::comp as component;
-use engine::{Container, Label};
+use engine::{Container, Label, NorLabels};
 
-pub trait Tr {}
+pub trait EFoo {}
 
 #[engine::system]
-fn foo(t6: &T6, dc: &c::e::DC, sc: Label<T6>, vc: Container<(T6, c::e::DC)>, t: &mut dyn Tr) {}
+fn foo(
+    t6: &T6,
+    dc: &c::e::DC,
+    sc: Label<T6>,
+    re: NorLabels<(T6,)>,
+    vc: Container<(&mut T6, &engine::Entity)>,
+    t: &mut dyn EFoo,
+    a: &mut a2::a3::A::A,
+) {
+}
 
 fn main() {
     c::e::bar();

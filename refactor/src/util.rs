@@ -61,6 +61,17 @@ impl<T> NoneOr<T> for Option<T> {
     }
 }
 
+// Trait for doing shit on tuples
+pub trait SplitIter<T, U, V> {
+    fn split(&self, f: impl Fn(&T, &U) -> V) -> V;
+}
+
+impl<T, U, V> SplitIter<T, U, V> for (T, U) {
+    fn split(&self, f: impl Fn(&T, &U) -> V) -> V {
+        f(&self.0, &self.1)
+    }
+}
+
 #[inline]
 pub fn end<T>(v: &Vec<T>, off: usize) -> usize {
     v.len().max(off) - off

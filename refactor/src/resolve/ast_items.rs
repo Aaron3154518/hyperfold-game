@@ -10,6 +10,7 @@ use crate::{
 
 use super::{
     ast_args::{ComponentMacroArgs, GlobalMacroArgs},
+    ast_paths::Paths,
     ast_resolve::Path,
 };
 
@@ -19,7 +20,7 @@ pub struct Component {
     pub args: ComponentMacroArgs,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Global {
     pub path: Path,
     pub args: GlobalMacroArgs,
@@ -69,7 +70,7 @@ impl ItemsCrate {
         }
     }
 
-    pub fn parse_crate(&mut self, cr: &Crate, engine_cr: &Crate, crates: &Vec<Crate>) {
+    pub fn parse_crate(&mut self, cr: &Crate, paths: &Paths, crates: &Vec<Crate>) {
         self.cr_name = cr.name.to_string();
         self.cr_idx = cr.idx;
         self.dependencies = cr
@@ -80,27 +81,10 @@ impl ItemsCrate {
                 cr_alias: alias.to_string(),
             })
             .collect::<Vec<_>>();
-        self.parse_mod(cr, &cr.main, engine_cr, crates);
+        self.parse_mod(cr, &cr.main, paths, crates);
     }
 
-    pub fn parse_mod(&mut self, cr: &Crate, m: &Mod, engine_cr: &Crate, crates: &Vec<Crate>) {
-        let comp_path = Path {
-            cr_idx: engine_cr.idx,
-            path: vec!["engine".to_string(), "component".to_string()],
-        };
-        let glob_path = Path {
-            cr_idx: engine_cr.idx,
-            path: vec!["engine".to_string(), "global".to_string()],
-        };
-        let event_path = Path {
-            cr_idx: engine_cr.idx,
-            path: vec!["engine".to_string(), "event".to_string()],
-        };
-        let system_path = Path {
-            cr_idx: engine_cr.idx,
-            path: vec!["engine".to_string(), "system".to_string()],
-        };
-
+    pub fn parse_mod(&mut self, cr: &Crate, m: &Mod, paths: &Paths, crates: &Vec<Crate>) {
         let cr_idx = cr.idx;
 
         for mi in m.marked.iter() {
@@ -108,7 +92,7 @@ impl ItemsCrate {
                 let match_path = resolve_path(path.to_vec(), cr, m, crates).get();
                 match &mi.ty {
                     crate::parse::ast_mod::MarkType::Struct => {
-                        if match_path == comp_path {
+                        if match_path == paths.component {
                             self.components.push(Component {
                                 path: Path {
                                     cr_idx,
@@ -117,7 +101,7 @@ impl ItemsCrate {
                                 args: ComponentMacroArgs::from(args.to_vec()),
                             });
                             break;
-                        } else if match_path == glob_path {
+                        } else if match_path == paths.global {
                             self.globals.push(Global {
                                 path: Path {
                                     cr_idx,
@@ -129,7 +113,7 @@ impl ItemsCrate {
                         }
                     }
                     crate::parse::ast_mod::MarkType::Fn { args } => {
-                        if match_path == system_path {
+                        if match_path == paths.system {
                             self.systems.push(System {
                                 path: Path {
                                     cr_idx,
@@ -148,7 +132,7 @@ impl ItemsCrate {
                         }
                     }
                     crate::parse::ast_mod::MarkType::Enum { variants } => {
-                        if match_path == event_path {
+                        if match_path == paths.event {
                             self.events.push(Event {
                                 path: Path {
                                     cr_idx,
@@ -163,6 +147,6 @@ impl ItemsCrate {
         }
         m.mods
             .iter()
-            .for_each(|m| self.parse_mod(cr, m, engine_cr, crates));
+            .for_each(|m| self.parse_mod(cr, m, paths, crates));
     }
 }
