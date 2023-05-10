@@ -55,7 +55,7 @@ fn main() {
 
     // test_resolves(&crates);
 
-    let items = crates
+    let mut items = crates
         .iter()
         .map(|cr| {
             let mut ic = ItemsCrate::new();
@@ -65,6 +65,6 @@ fn main() {
         .collect::<Vec<_>>();
     // println!("{:#?}", items);
 
-    let data = ItemData::validate(&items);
+    let data = ItemData::validate(&mut items);
     println!("{:#?}", data);
 }

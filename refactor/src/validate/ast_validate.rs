@@ -88,7 +88,7 @@ pub struct ItemData {
 }
 
 impl ItemData {
-    pub fn validate(crates: &Vec<ItemsCrate>) -> Self {
+    pub fn validate(crates: &mut Vec<ItemsCrate>) -> Self {
         // Collect items
         let (mut cs, mut gs, mut es, mut ss) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
         for cr in crates.iter() {
@@ -113,45 +113,42 @@ impl ItemData {
         });
         traits.iter().for_each(|g| gs.push(&g));
 
+        // Sort in order of crate index
+        crates.sort_by_key(|cr| cr.cr_idx);
+
+        // Don't use '|' in sub data formats
         let [components_data, globals_data, events_data, systems_data, dependencies_data] = crates
             .iter()
             .fold(
                 [Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()],
                 |[mut cd, mut gd, mut ed, mut sd, mut dd], cr| {
-                    cd.push(format!(
-                        "{}({})",
-                        cr.cr_idx,
+                    cd.push(
                         cr.components
-                            .join_map(|c| c.path.root_path(crates).join("::"), ",")
-                    ));
-                    gd.push(format!(
-                        "{}({})",
-                        cr.cr_idx,
+                            .join_map(|c| c.path.root_path(crates).join("::"), ","),
+                    );
+                    gd.push(
                         cr.globals
-                            .join_map(|g| g.path.root_path(crates).join("::"), ",")
+                            .join_map(|g| g.path.root_path(crates).join("::"), ","),
+                    );
+                    ed.push(cr.events.join_map(
+                        |e| {
+                            format!(
+                                "{}({})",
+                                e.path.root_path(crates).join("::"),
+                                e.variants.join(",")
+                            )
+                        },
+                        ",",
                     ));
-                    ed.push(format!(
-                        "{}({})",
-                        cr.cr_idx,
-                        cr.events
-                            .join_map(|e| e.path.root_path(crates).join("::"), ",")
-                    ));
-                    sd.push(format!(
-                        "{}({})",
-                        cr.cr_idx,
-                        cr.systems.join_map(|s| s.validate_to_data(crates), ",")
-                    ));
-                    dd.push(format!(
-                        "{}:{}({})",
-                        cr.cr_name,
-                        cr.cr_idx,
+                    sd.push(cr.systems.join_map(|s| s.validate_to_data(crates), ","));
+                    dd.push(
                         cr.dependencies
-                            .join_map(|d| format!("{}:{}", d.cr_alias, d.cr_idx), ",")
-                    ));
+                            .join_map(|d| format!("{}:{}", d.cr_alias, d.cr_idx), ","),
+                    );
                     [cd, gd, ed, sd, dd]
                 },
             )
-            .map(|v| v.join(" "));
+            .map(|v| v.join("|"));
 
         Self {
             components_data,
