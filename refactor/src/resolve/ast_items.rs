@@ -40,7 +40,7 @@ pub struct System {
 #[derive(Debug)]
 pub struct Dependency {
     pub cr_idx: usize,
-    pub name: String,
+    pub cr_alias: String,
 }
 
 // Pass 2: use resolving
@@ -75,9 +75,9 @@ impl ItemsCrate {
         self.dependencies = cr
             .deps
             .iter()
-            .map(|(&cr_idx, name)| Dependency {
+            .map(|(&cr_idx, alias)| Dependency {
                 cr_idx,
-                name: name.to_string(),
+                cr_alias: alias.to_string(),
             })
             .collect::<Vec<_>>();
         self.parse_mod(cr, &cr.main, engine_cr, crates);

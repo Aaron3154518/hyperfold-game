@@ -1,7 +1,7 @@
 use parse_cfg::Cfg;
 use quote::ToTokens;
 
-use crate::util::parse_vec_path;
+use crate::util::{parse_vec_path, NoneOr};
 
 // Parse attributes from engine components
 #[derive(Copy, Clone, Debug)]
@@ -51,7 +51,7 @@ pub fn get_attributes_if_active(
             match a {
                 Attribute::Ecs(ty, args) => new_attrs.push((ty, args)),
                 Attribute::Cfg(cfg) => {
-                    is_active = !eval_cfg_args(&cfg, features).is_some_and(|b| !b)
+                    is_active = eval_cfg_args(&cfg, features).is_none_or_into(|b| b)
                 }
             }
             new_attrs
@@ -91,7 +91,7 @@ pub fn eval_cfg_args(cfg: &Cfg, features: &Vec<String>) -> Option<bool> {
         Cfg::All(cfgs) => Some(
             !cfgs
                 .iter()
-                .map(|cfg| !eval_cfg_args(&cfg, &features).is_some_and(|b| !b))
+                .map(|cfg| eval_cfg_args(&cfg, &features).is_none_or_into(|b| b))
                 .collect::<Vec<_>>()
                 .contains(&false),
         ),

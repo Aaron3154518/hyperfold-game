@@ -1,15 +1,78 @@
+use std::cmp::min;
+
 use crate::{
+    parse::ast_fn_arg::FnArg,
     resolve::{
         ast_args::GlobalMacroArgs,
         ast_items::{Global, ItemsCrate, System},
         ast_resolve::Path,
     },
-    util::JoinMap,
+    util::{JoinMap, NoneOr},
 };
 
-impl System {
+impl Path {
+    pub fn root_path(&self, crates: &Vec<ItemsCrate>) -> Vec<String> {
+        if self.cr_idx == 0 {
+            return self.path.to_vec();
+        }
+
+        // Dijkstra's with weight = length of crate name
+        let (mut frontier, mut visited) = (vec![(vec![0], 0)], vec![0]);
+        loop {
+            let mut min_path: Option<_> = None;
+            for (path, score) in frontier.iter() {
+                let cr_idx = *path.last().expect("Empty path in root_path()");
+                if cr_idx == self.cr_idx {
+                    return [
+                        // Use crate instead of first crate name
+                        vec!["crate".to_string()],
+                        path[1..]
+                            .iter()
+                            .map(|cr_idx| crates[*cr_idx].cr_name.to_string())
+                            .collect::<Vec<_>>(),
+                        // Trim off crate name
+                        self.path[1..].to_vec(),
+                    ]
+                    .concat();
+                }
+                for d in crates[cr_idx].dependencies.iter() {
+                    if !visited.contains(&d.cr_idx)
+                        && min_path
+                            .is_none_or(|(_, min_score)| *min_score > *score + d.cr_alias.len())
+                    {
+                        min_path = Some((
+                            [path.to_vec(), vec![d.cr_idx]].concat(),
+                            *score + d.cr_alias.len(),
+                        ))
+                    }
+                }
+            }
+            if let Some((new_path, new_score)) = min_path {
+                visited.push(*new_path.last().expect("Empty new path in root_path()"));
+                frontier.push((new_path, new_score));
+            } else {
+                panic!(
+                    "Could not find path from entry crate to crate {}",
+                    self.cr_idx
+                );
+            }
+        }
+    }
+}
+
+impl FnArg {
     pub fn validate_to_data(&self) -> String {
         String::new()
+    }
+}
+
+impl System {
+    pub fn validate_to_data(&self, crates: &Vec<ItemsCrate>) -> String {
+        format!(
+            "{}({})",
+            self.path.root_path(crates).join("::"),
+            self.args.join_map(FnArg::validate_to_data, ",")
+        )
     }
 }
 
@@ -58,29 +121,32 @@ impl ItemData {
                     cd.push(format!(
                         "{}({})",
                         cr.cr_idx,
-                        cr.components.join_map(|c| c.path.path.join("::"), ",")
+                        cr.components
+                            .join_map(|c| c.path.root_path(crates).join("::"), ",")
                     ));
                     gd.push(format!(
                         "{}({})",
                         cr.cr_idx,
-                        cr.globals.join_map(|g| g.path.path.join("::"), ",")
+                        cr.globals
+                            .join_map(|g| g.path.root_path(crates).join("::"), ",")
                     ));
                     ed.push(format!(
                         "{}({})",
                         cr.cr_idx,
-                        cr.events.join_map(|e| e.path.path.join("::"), ",")
+                        cr.events
+                            .join_map(|e| e.path.root_path(crates).join("::"), ",")
                     ));
                     sd.push(format!(
                         "{}({})",
                         cr.cr_idx,
-                        cr.systems.join_map(|s| s.validate_to_data(), ",")
+                        cr.systems.join_map(|s| s.validate_to_data(crates), ",")
                     ));
                     dd.push(format!(
                         "{}:{}({})",
                         cr.cr_name,
                         cr.cr_idx,
                         cr.dependencies
-                            .join_map(|d| format!("{}:{}", d.name, d.cr_idx), ",")
+                            .join_map(|d| format!("{}:{}", d.cr_alias, d.cr_idx), ",")
                     ));
                     [cd, gd, ed, sd, dd]
                 },

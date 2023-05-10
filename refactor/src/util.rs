@@ -33,17 +33,31 @@ impl<T> Get<T> for Result<T, T> {
 
 // Trait for mapping Vec elements to strings and joining them
 pub trait JoinMap<T> {
-    fn join_map<F>(&self, f: F, sep: &str) -> String
-    where
-        F: Fn(&T) -> String;
+    fn join_map(&self, f: impl Fn(&T) -> String, sep: &str) -> String;
 }
 
 impl<T> JoinMap<T> for Vec<T> {
-    fn join_map<F>(&self, f: F, sep: &str) -> String
-    where
-        F: Fn(&T) -> String,
-    {
+    fn join_map(&self, f: impl Fn(&T) -> String, sep: &str) -> String {
         self.iter().map(f).collect::<Vec<_>>().join(sep)
+    }
+}
+
+// Trait for logic on None values in Options
+pub trait NoneOr<T> {
+    fn is_none_or_into(self, f: impl FnOnce(T) -> bool) -> bool;
+    fn is_none_or(&self, f: impl FnOnce(&T) -> bool) -> bool;
+}
+
+impl<T> NoneOr<T> for Option<T> {
+    fn is_none_or_into(self, f: impl FnOnce(T) -> bool) -> bool {
+        !self.is_some_and(|t| !f(t))
+    }
+
+    fn is_none_or(&self, f: impl FnOnce(&T) -> bool) -> bool {
+        match self {
+            Some(t) => f(t),
+            None => true,
+        }
     }
 }
 
