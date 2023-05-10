@@ -26,7 +26,7 @@ fn test_resolves(crates: &Vec<Crate>) {
         vec!["crate", "a2", "a3", "B", "A2"],
         vec!["crate", "a2", "a3", "A3", "A1"],
         vec!["crate", "a2", "a2", "A3", "A1"],
-        vec!["macros", "component"],
+        vec!["engine", "component"],
         vec!["crate", "component"],
         vec!["crate", "a2", "a3", "mac", "global"],
     ] {
@@ -44,13 +44,13 @@ fn test_resolves(crates: &Vec<Crate>) {
 
 fn main() {
     let engine_dir =
-        fs::canonicalize(PathBuf::from("macros")).expect("Could not canonicalize engine path");
+        fs::canonicalize(PathBuf::from("engine")).expect("Could not canonicalize engine path");
     let crates = Crate::parse(PathBuf::from("test/a"));
     let engine_crate = crates
         .iter()
         .find(|cr| cr.dir == engine_dir)
         .expect("Could not find engine crate. Please include it");
-    println!("{:#?}", crates);
+    // println!("{:#?}", crates);
     // test_resolves(&crates);
     let items = crates
         .iter()

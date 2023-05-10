@@ -1,7 +1,11 @@
 use crate::{
-    parse::{ast_crate::Crate, ast_mod::Mod},
+    parse::{
+        ast_crate::Crate,
+        ast_fn_arg::{FnArg, FnArgType},
+        ast_mod::Mod,
+    },
     resolve::ast_resolve::resolve_path,
-    util::{Expect, Get},
+    util::{Catch, Get},
 };
 
 use super::{
@@ -30,6 +34,7 @@ pub struct Event {
 #[derive(Debug)]
 pub struct System {
     path: Vec<String>,
+    args: Vec<FnArg>,
 }
 
 #[derive(Debug)]
@@ -39,7 +44,6 @@ pub struct Dependency {
 
 // Pass 2: use resolving
 // Resolve macro paths - convert to engine items
-// Resolve system arg paths
 #[derive(Debug)]
 pub struct ItemsCrate {
     pub cr_idx: usize,
@@ -68,17 +72,25 @@ impl ItemsCrate {
     pub fn parse_mod(&mut self, cr: &Crate, m: &Mod, engine_cr: &Crate, crates: &Vec<Crate>) {
         let comp_path = Path {
             cr_idx: engine_cr.idx,
-            path: vec!["crate".to_string(), "component".to_string()],
+            path: vec!["engine".to_string(), "component".to_string()],
         };
         let glob_path = Path {
             cr_idx: engine_cr.idx,
-            path: vec!["crate".to_string(), "global".to_string()],
+            path: vec!["engine".to_string(), "global".to_string()],
+        };
+        let event_path = Path {
+            cr_idx: engine_cr.idx,
+            path: vec!["engine".to_string(), "event".to_string()],
+        };
+        let system_path = Path {
+            cr_idx: engine_cr.idx,
+            path: vec!["engine".to_string(), "system".to_string()],
         };
 
         for mi in m.marked.iter() {
             for (path, args) in mi.attrs.iter() {
                 let match_path = resolve_path(path.to_vec(), cr, m, crates).get();
-                match mi.ty {
+                match &mi.ty {
                     crate::parse::ast_mod::MarkType::Struct => {
                         if match_path == comp_path {
                             self.components.push(Component {
@@ -94,8 +106,25 @@ impl ItemsCrate {
                             break;
                         }
                     }
-                    crate::parse::ast_mod::MarkType::Fn => {}
-                    crate::parse::ast_mod::MarkType::Enum => {}
+                    crate::parse::ast_mod::MarkType::Fn { args } => self.systems.push(System {
+                        path: mi.sym.path.to_vec(),
+                        args: args
+                            .iter()
+                            .map(|a| {
+                                let mut a = a.to_owned();
+                                a.resolve_paths(cr, m, crates);
+                                a
+                            })
+                            .collect(),
+                    }),
+                    crate::parse::ast_mod::MarkType::Enum { variants } => {
+                        if match_path == event_path {
+                            self.events.push(Event {
+                                path: mi.sym.path.to_vec(),
+                                variants: variants.to_vec(),
+                            })
+                        }
+                    }
                 }
             }
         }
@@ -104,3 +133,6 @@ impl ItemsCrate {
             .for_each(|m| self.parse_mod(cr, m, engine_cr, crates));
     }
 }
+
+// Pass 3: Item resolution
+// Resolve system arg paths

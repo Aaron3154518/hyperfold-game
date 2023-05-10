@@ -1,1 +1,2 @@
-
+#[engine::system]
+fn sys() {}

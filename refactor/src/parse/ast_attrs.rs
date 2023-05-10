@@ -1,7 +1,7 @@
 use parse_cfg::Cfg;
 use quote::ToTokens;
 
-use crate::util::parse_use;
+use crate::util::parse_vec_path;
 
 // Parse attributes from engine components
 #[derive(Copy, Clone, Debug)]
@@ -65,7 +65,7 @@ pub fn get_attributes(attrs: &Vec<syn::Attribute>, path: &Vec<String>) -> Vec<At
         .iter()
         .map(|a| {
             parse_attr_args(
-                Attribute::from(parse_use(
+                Attribute::from(parse_vec_path(
                     path,
                     &a.path()
                         .segments

@@ -4,14 +4,16 @@ use syn::visit::Visit;
 
 use crate::{
     parse::ast_attrs::{get_attributes_if_active, Attribute, EcsAttribute},
-    util::{end, Expect},
+    util::{end, Catch},
 };
+
+use super::ast_fn_arg::FnArg;
 
 #[derive(Debug)]
 pub enum MarkType {
     Struct,
-    Fn,
-    Enum,
+    Fn { args: Vec<FnArg> },
+    Enum { variants: Vec<String> },
 }
 
 // TODO: Cfg features
@@ -87,8 +89,10 @@ impl Mod {
         ));
         self.visit_file(&ast);
     }
+}
 
-    // File/items
+// File/items
+impl Mod {
     pub fn visit_file(&mut self, i: &syn::File) {
         self.visit_items(&i.items);
     }
@@ -185,7 +189,21 @@ impl Mod {
         if let Some(attrs) = get_attributes_if_active(&i.attrs, &self.path, &Vec::new()) {
             if !attrs.is_empty() {
                 self.marked.push(MarkedItem {
-                    ty: MarkType::Fn,
+                    ty: MarkType::Fn {
+                        args: i
+                            .sig
+                            .inputs
+                            .iter()
+                            .filter_map(|arg| match arg {
+                                syn::FnArg::Typed(t) => {
+                                    let mut sys_arg = FnArg::new();
+                                    sys_arg.parse_arg(0, &self.path, &t);
+                                    Some(sys_arg)
+                                }
+                                syn::FnArg::Receiver(_) => None,
+                            })
+                            .collect(),
+                    },
                     sym: Symbol::from(self.path.to_vec(), &i.sig.ident, &i.vis),
                     attrs,
                 });
@@ -198,15 +216,19 @@ impl Mod {
         if let Some(attrs) = get_attributes_if_active(&i.attrs, &self.path, &Vec::new()) {
             if !attrs.is_empty() {
                 self.marked.push(MarkedItem {
-                    ty: MarkType::Enum,
+                    ty: MarkType::Enum {
+                        variants: i.variants.iter().map(|v| v.ident.to_string()).collect(),
+                    },
                     sym: Symbol::from(self.path.to_vec(), &i.ident, &i.vis),
                     attrs,
                 });
             }
         }
     }
+}
 
-    // Use paths
+// Use paths
+impl Mod {
     fn visit_item_use(&mut self, i: &syn::ItemUse) {
         if let Some(attrs) = get_attributes_if_active(&i.attrs, &self.path, &Vec::new()) {
             let mut uses = self.visit_use_tree(&i.tree, &mut Vec::new(), Vec::new());

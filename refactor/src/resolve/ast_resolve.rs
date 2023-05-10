@@ -4,14 +4,26 @@ use crate::parse::{
     ast_crate::Crate,
     ast_mod::{Mod, Symbol},
 };
-use crate::util::Expect;
+use crate::util::Catch;
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Path {
     pub cr_idx: usize,
     pub path: Vec<String>,
 }
 
+impl Path {
+    pub fn new() -> Self {
+        Self {
+            cr_idx: 0,
+            path: Vec::new(),
+        }
+    }
+}
+
+// Err means:
+// 1) Not from a valid crate
+// 2) resolve_mod() returns Err
 pub fn resolve(path: Vec<String>, cr: &Crate, crates: &Vec<Crate>) -> Result<Path, Path> {
     // println!("Resolve: {}", path.join("::"));
     let cr_idx = cr.idx;
@@ -34,6 +46,10 @@ pub fn resolve(path: Vec<String>, cr: &Crate, crates: &Vec<Crate>) -> Result<Pat
 }
 
 // Assumes we already match with mod
+// Err if:
+// 1) Does not match anything
+// 2) Matches mod but remainder doesn't match
+// 3) Matches use statement new path doesn't match
 pub fn resolve_mod(
     path: Vec<String>,
     idx: usize,
@@ -48,11 +64,6 @@ pub fn resolve_mod(
     // );
     let cr_idx = cr.idx;
 
-    // Ran out of stuff to parse
-    if idx == path.len() {
-        return Ok(Path { cr_idx, path });
-    }
-
     let name = path
         .get(idx)
         .catch(format!(
@@ -65,7 +76,12 @@ pub fn resolve_mod(
     for m in m.mods.iter() {
         if name == *m.path.last().expect("Mod path is empty") {
             // println!("Found Mod: {}", name);
-            return resolve_mod(path, idx + 1, cr, m, crates);
+            return if idx + 1 == path.len() {
+                // The path points to a mod
+                Ok(Path { cr_idx, path })
+            } else {
+                return resolve_mod(path, idx + 1, cr, m, crates);
+            };
         }
     }
     // Check symbols

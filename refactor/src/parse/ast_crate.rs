@@ -7,7 +7,7 @@ use std::{
 };
 
 use super::{ast_file::DirType, ast_mod::Mod};
-use crate::util::Expect;
+use crate::util::Catch;
 
 #[derive(Debug)]
 pub struct Crate {

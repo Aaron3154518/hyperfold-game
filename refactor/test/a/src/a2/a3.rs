@@ -12,7 +12,7 @@ pub mod A {
     }
 }
 
-use macros as mac;
+use engine as mac;
 
 pub mod B {
     use super::hash::Hash;
