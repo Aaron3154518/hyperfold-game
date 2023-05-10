@@ -28,9 +28,9 @@ fn foo(
     t6: &T6,
     dc: &c::e::DC,
     sc: Label<T6>,
-    re: NorLabels<(T6,)>,
+    re: NorLabels<(&T6,)>,
     vc: Container<(&mut T6, &engine::Entity)>,
-    t: &mut dyn EFoo,
+    t: &dyn EFoo,
     a: &mut a2::a3::A::A,
 ) {
 }

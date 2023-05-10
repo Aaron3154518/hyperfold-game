@@ -33,11 +33,11 @@ impl<T> Get<T> for Result<T, T> {
 
 // Trait for mapping Vec elements to strings and joining them
 pub trait JoinMap<T> {
-    fn join_map(&self, f: impl Fn(&T) -> String, sep: &str) -> String;
+    fn join_map(&self, f: impl FnMut(&T) -> String, sep: &str) -> String;
 }
 
 impl<T> JoinMap<T> for Vec<T> {
-    fn join_map(&self, f: impl Fn(&T) -> String, sep: &str) -> String {
+    fn join_map(&self, f: impl FnMut(&T) -> String, sep: &str) -> String {
         self.iter().map(f).collect::<Vec<_>>().join(sep)
     }
 }

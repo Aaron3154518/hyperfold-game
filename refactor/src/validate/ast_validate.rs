@@ -70,7 +70,6 @@ impl Path {
     }
 }
 
-// TODO: collect all errors
 impl FnArg {
     // Convert to data
     fn to_eid(&self, paths: &Paths) -> Option<()> {
@@ -153,9 +152,9 @@ impl FnArg {
     }
 
     // Validate conditions
-    fn validate_ref(&self, should_be_cnt: usize) {
+    fn validate_ref(&self, should_be_cnt: usize, errs: &mut Vec<String>) {
         if self.ref_cnt != should_be_cnt {
-            panic!(
+            errs.push(format!(
                 "Type should be taken by {}: \"{}\"",
                 if should_be_cnt == 0 {
                     "borrow".to_string()
@@ -165,13 +164,13 @@ impl FnArg {
                     format!("{} references", should_be_cnt)
                 },
                 self
-            )
+            ))
         }
     }
 
-    fn validate_mut(&self, should_be_mut: bool) {
+    fn validate_mut(&self, should_be_mut: bool, errs: &mut Vec<String>) {
         if self.mutable != should_be_mut {
-            panic!(
+            errs.push(format!(
                 "Type should be taken {}: \"{}\"",
                 if should_be_mut {
                     "mutably"
@@ -179,32 +178,37 @@ impl FnArg {
                     "immutably"
                 },
                 self
-            )
+            ))
         }
     }
 
-    pub fn validate_to_data(&self, paths: &Paths, items: &ItemList) -> String {
-        self
+    pub fn validate_to_data(
+        &self,
+        paths: &Paths,
+        items: &ItemList,
+        errs: &mut Vec<String>,
+    ) -> String {
+        match self
             // Entity ID
             .to_eid(paths)
             .map(|_| {
-                self.validate_ref(1);
-                self.validate_mut(false);
+                self.validate_ref(1, errs);
+                self.validate_mut(false, errs);
                 "id".to_string()
             })
             // Component
             .or_else(|| {
                 self.to_component(items).map(|(cr_i, c_i, _)| {
-                    self.validate_ref(1);
+                    self.validate_ref(1, errs);
                     format!("c{}:{}", cr_i, c_i)
                 })
             })
             // Global
             .or_else(|| {
                 self.to_global(items).map(|(cr_i, g_i, g_args)| {
-                    self.validate_ref(1);
+                    self.validate_ref(1, errs);
                     if g_args.is_const {
-                        self.validate_mut(false);
+                        self.validate_mut(false, errs);
                     }
                     format!("g{}:{}", cr_i, g_i)
                 })
@@ -212,8 +216,8 @@ impl FnArg {
             // Event
             .or_else(|| {
                 self.to_event(items).map(|(cr_i, e_i, v_i)| {
-                    self.validate_ref(1);
-                    self.validate_mut(false);
+                    self.validate_ref(1, errs);
+                    self.validate_mut(false, errs);
                     format!("e{}:{}:{}", cr_i, e_i, v_i)
                 })
             })
@@ -221,22 +225,28 @@ impl FnArg {
             .or_else(|| {
                 // This assumes the traits are all at the beginning of the globals list
                 self.to_trait(items).map(|(cr_i, g_i)| {
-                    self.validate_ref(1);
+                    self.validate_ref(1, errs);
                     format!("g{}:{}", cr_i, g_i)
                 })
             })
             // Label
             .or_else(|| {
                 self.to_label(paths).map(|(l_ty, args)| {
-                    self.validate_ref(0);
+                    self.validate_ref(0, errs);
                     format!(
                         "l{}{}",
                         l_ty,
                         args.join_map(
-                            |a| a
-                                .to_component(items)
-                                .map(|(cr_i, c_i, _)| format!("{}:{}", cr_i, c_i))
-                                .catch(format!("Label expects Component type, found: {}", a)),
+                            |a| a.to_component(items).map_or_else(
+                                || {
+                                    errs.push(format!(
+                                        "Label expects Component type, found: {}",
+                                        a
+                                    ));
+                                    String::new()
+                                },
+                                |(cr_i, c_i, _)| format!("{}:{}", cr_i, c_i)
+                            ),
                             ","
                         )
                     )
@@ -245,31 +255,42 @@ impl FnArg {
             // Container
             .or_else(|| {
                 self.to_container(paths).map(|args| {
-                    self.validate_ref(0);
+                    self.validate_ref(0, errs);
                     format!(
                         "v{}",
                         args.join_map(
                             |a| a
                                 .to_eid(paths)
                                 .map(|_| {
-                                    a.validate_ref(1);
-                                    a.validate_mut(false);
+                                    a.validate_ref(1, errs);
+                                    a.validate_mut(false, errs);
                                     "id".to_string()
                                 })
                                 .or_else(|| a.to_component(items).map(|(cr_i, c_i, _)| {
-                                    a.validate_ref(1);
+                                    a.validate_ref(1, errs);
                                     format!("{}{}:{}", if a.mutable { "m" } else { "" }, cr_i, c_i)
                                 }))
-                                .catch(format!(
-                                    "Container expects Component or Entity ID type, found: {}",
-                                    a
-                                )),
+                                .map_or_else(
+                                    || {
+                                        errs.push(format!(
+                                        "Container expects Component or Entity ID type, found: {}",
+                                        a
+                                    ));
+                                        String::new()
+                                    },
+                                    |s| s
+                                ),
                             ":"
                         )
                     )
                 })
-            })
-            .catch(format!("Argument: \"{}\" is not a known type", self))
+            }) {
+            Some(data) => data,
+            None => {
+                errs.push(format!("Argument: \"{}\" is not a known type", self));
+                String::new()
+            }
+        }
     }
 }
 
@@ -280,12 +301,21 @@ impl System {
         crates: &Vec<ItemsCrate>,
         items: &ItemList,
     ) -> String {
-        format!(
+        let mut errs = Vec::new();
+        let data = format!(
             "{}({})",
             self.path.root_path(crates).join("::"),
             self.args
-                .join_map(|a| a.validate_to_data(paths, items), ",")
-        )
+                .join_map(|a| a.validate_to_data(paths, items, &mut errs), ",")
+        );
+        if !errs.is_empty() {
+            panic!(
+                "\n\nIn system: \"{}()\"\n{}\n\n",
+                self.path.path.join("::"),
+                errs.join("\n")
+            )
+        }
+        data
     }
 }
 
