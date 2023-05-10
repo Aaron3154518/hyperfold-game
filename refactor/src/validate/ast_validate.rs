@@ -4,11 +4,13 @@ use crate::{
     parse::ast_fn_arg::FnArg,
     resolve::{
         ast_args::GlobalMacroArgs,
-        ast_items::{Global, ItemsCrate, System},
+        ast_items::{Dependency, Global, ItemsCrate, System},
         ast_resolve::Path,
     },
     util::{JoinMap, NoneOr},
 };
+
+const NAMESPACE: &str = "_engine";
 
 impl Path {
     pub fn root_path(&self, crates: &Vec<ItemsCrate>) -> Vec<String> {
@@ -16,39 +18,46 @@ impl Path {
             return self.path.to_vec();
         }
 
+        let start_dep = Dependency {
+            cr_idx: 0,
+            cr_alias: String::new(),
+        };
+
         // Dijkstra's with weight = length of crate name
-        let (mut frontier, mut visited) = (vec![(vec![0], 0)], vec![0]);
+        let (mut frontier, mut visited) = (vec![(vec![&start_dep], 0)], vec![0]);
         loop {
-            let mut min_path: Option<_> = None;
+            let mut min_path = None;
             for (path, score) in frontier.iter() {
-                let cr_idx = *path.last().expect("Empty path in root_path()");
-                if cr_idx == self.cr_idx {
-                    return [
-                        // Use crate instead of first crate name
-                        vec!["crate".to_string()],
-                        path[1..]
-                            .iter()
-                            .map(|cr_idx| crates[*cr_idx].cr_name.to_string())
-                            .collect::<Vec<_>>(),
-                        // Trim off crate name
-                        self.path[1..].to_vec(),
-                    ]
-                    .concat();
+                let dep = *path.last().expect("Empty path in root_path()");
+                if dep.cr_idx == self.cr_idx {
+                    let mut use_path = Vec::new();
+                    // Don't include entry crate
+                    for d in path[1..].iter() {
+                        use_path.push(d.cr_alias.to_string());
+                        use_path.push(NAMESPACE.to_string());
+                    }
+                    use_path.extend(self.path[1..].to_vec().into_iter());
+                    return use_path;
                 }
-                for d in crates[cr_idx].dependencies.iter() {
+                for d in crates[dep.cr_idx].dependencies.iter() {
                     if !visited.contains(&d.cr_idx)
                         && min_path
                             .is_none_or(|(_, min_score)| *min_score > *score + d.cr_alias.len())
                     {
                         min_path = Some((
-                            [path.to_vec(), vec![d.cr_idx]].concat(),
+                            [path.to_vec(), vec![&d]].concat(),
                             *score + d.cr_alias.len(),
                         ))
                     }
                 }
             }
             if let Some((new_path, new_score)) = min_path {
-                visited.push(*new_path.last().expect("Empty new path in root_path()"));
+                visited.push(
+                    new_path
+                        .last()
+                        .expect("Empty new_path in root_path()")
+                        .cr_idx,
+                );
                 frontier.push((new_path, new_score));
             } else {
                 panic!(
@@ -62,6 +71,12 @@ impl Path {
 
 impl FnArg {
     pub fn validate_to_data(&self) -> String {
+        match self.ty {
+            crate::parse::ast_fn_arg::FnArgType::Path(_) => {}
+            crate::parse::ast_fn_arg::FnArgType::Trait(_) => {}
+            crate::parse::ast_fn_arg::FnArgType::SContainer(_, _) => {}
+            crate::parse::ast_fn_arg::FnArgType::Container(_, _) => {}
+        }
         String::new()
     }
 }

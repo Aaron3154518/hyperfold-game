@@ -24,10 +24,10 @@ use engine::{Container, Label};
 pub trait Tr {}
 
 #[engine::system]
-fn foo(t6: &T6, dc: &c::d::DC, sc: Label<T6>, vc: Container<(T6, c::d::DC)>, t: &mut dyn Tr) {}
+fn foo(t6: &T6, dc: &c::e::DC, sc: Label<T6>, vc: Container<(T6, c::e::DC)>, t: &mut dyn Tr) {}
 
 fn main() {
-    c::d::bar();
+    c::e::bar();
 
     println!("Hello, world!");
 }

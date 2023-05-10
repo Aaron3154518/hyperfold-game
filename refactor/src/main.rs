@@ -16,6 +16,19 @@ mod util;
 mod validate;
 
 fn test_resolves(crates: &Vec<Crate>) {
+    let test = |v: Vec<&str>| {
+        println!(
+            "{}\n{:#?}",
+            v.join("::"),
+            ast_resolve::resolve(
+                v.iter().map(|s| s.to_string()).collect(),
+                &crates[0],
+                &crates
+            )
+        )
+    };
+
+    println!("\nOk:\n");
     for v in [
         vec!["crate", "T1"],
         vec!["crate", "a1", "A"],
@@ -27,19 +40,18 @@ fn test_resolves(crates: &Vec<Crate>) {
         vec!["crate", "a2", "a3", "B", "A2"],
         vec!["crate", "a2", "a3", "A3", "A1"],
         vec!["crate", "a2", "a2", "A3", "A1"],
+        vec!["crate", "c", "e", "DC"],
+    ] {
+        test(v)
+    }
+
+    println!("\nErr:\n");
+    for v in [
         vec!["engine", "component"],
         vec!["crate", "component"],
         vec!["crate", "a2", "a3", "mac", "global"],
     ] {
-        println!(
-            "{}\n{:#?}",
-            v.join("::"),
-            ast_resolve::resolve(
-                v.iter().map(|s| s.to_string()).collect(),
-                &crates[0],
-                &crates
-            )
-        )
+        test(v)
     }
 }
 
