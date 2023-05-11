@@ -1,4 +1,8 @@
-use std::cmp::min;
+use std::{
+    cmp::min,
+    fs::{self, File},
+    io::Write,
+};
 
 use crate::{
     parse::ast_fn_arg::{FnArg, FnArgType},
@@ -11,7 +15,10 @@ use crate::{
     util::{end, Catch, JoinMap, NoneOr, SplitIter},
 };
 
-use super::ast_item_list::ItemList;
+use super::{
+    ast_item_list::ItemList,
+    constants::{DATA_FILE, SEP},
+};
 
 // Pass 3: Item validation
 // Map system arg paths to items
@@ -46,7 +53,6 @@ impl ItemData {
         // Collect items
         let items = ItemList::from(crates, &traits);
 
-        let sep = ";";
         let [components_data, globals_data, events_data, systems_data, dependencies_data] = [
             items
                 .components
@@ -84,16 +90,20 @@ impl ItemData {
             crates
                 .iter()
                 .map(|cr| {
-                    cr.dependencies
-                        .join_map(|d| format!("{}:{}", d.cr_alias, d.cr_idx), ",")
+                    format!(
+                        "{}:{}",
+                        cr.cr_name,
+                        cr.dependencies
+                            .join_map(|d| format!("{}:{}", d.cr_alias, d.cr_idx), ",")
+                    )
                 })
                 .collect(),
         ]
         .map(|v: Vec<_>| {
-            if let Some(s) = v.iter().find(|s| s.contains(sep)) {
-                panic!("Found separator \"{}\" in data string: \"{}\"", sep, s)
+            if let Some(s) = v.iter().find(|s| s.contains(SEP)) {
+                panic!("Found separator \"{}\" in data string: \"{}\"", SEP, s)
             }
-            v.join(sep)
+            v.join(SEP)
         });
 
         Self {
@@ -103,5 +113,20 @@ impl ItemData {
             systems_data,
             dependencies_data,
         }
+    }
+
+    pub fn write_to_file(&self) {
+        fs::write(
+            std::env::temp_dir().join(DATA_FILE),
+            format!(
+                "{}\n{}\n{}\n{}\n{}",
+                &self.components_data,
+                &self.globals_data,
+                &self.events_data,
+                &self.systems_data,
+                &self.dependencies_data,
+            ),
+        )
+        .expect("Could not write to data file");
     }
 }

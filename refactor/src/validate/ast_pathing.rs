@@ -6,7 +6,7 @@ use crate::{
     util::NoneOr,
 };
 
-pub const NAMESPACE: &str = "_engine";
+use super::constants::NAMESPACE;
 
 impl Path {
     pub fn root_path(&self, crates: &Vec<ItemsCrate>) -> Vec<String> {

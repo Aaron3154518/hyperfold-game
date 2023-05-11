@@ -9,14 +9,22 @@ use parse::ast_crate::Crate;
 use resolve::ast_resolve;
 
 use crate::{
+    decode::decoder::Decoder,
     resolve::{ast_items::ItemsCrate, ast_paths::Paths},
     validate::ast_validate::ItemData,
 };
 
+mod decode;
 mod parse;
 mod resolve;
 mod util;
 mod validate;
+
+// Process:
+// 1) Parse - for each crate: traverse AST, extract important items/uses/mods/dependencies
+// 2) Resolve - resolve item paths within/across crates
+// 3) Validate - convert IR to data format and validate items
+// 4) Decode - convert data back to IR
 
 fn test_resolves(crates: &Vec<Crate>) {
     let test = |v: Vec<&str>| {
@@ -84,5 +92,11 @@ fn main() {
     // println!("{:#?}", items);
 
     let data = ItemData::validate(&paths, &mut items);
+    data.write_to_file();
     println!("{:#?}", data);
+
+    let decoder = Decoder::new();
+    // println!("{:#?}", decoder);
+    println!("{:#?}", decoder.get_dependencies("a".to_string()));
+    println!("{:#?}", decoder.get_dependencies("b".to_string()));
 }
