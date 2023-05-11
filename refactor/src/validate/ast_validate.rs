@@ -12,7 +12,7 @@ use crate::{
         ast_paths::Paths,
         ast_resolve::Path,
     },
-    util::{end, Catch, JoinMap, NoneOr, SplitIter},
+    util::{end, Catch, JoinMap, JoinMapInto, NoneOr, SplitIter},
 };
 
 use super::{
@@ -30,6 +30,7 @@ pub struct ItemData {
     pub systems_data: String,
     pub dependencies_data: String,
     pub paths_data: String,
+    pub crates_data: String,
 }
 
 impl ItemData {
@@ -54,23 +55,17 @@ impl ItemData {
         // Collect items
         let items = ItemList::from(crates, &traits);
 
-        let [components_data, globals_data, events_data, systems_data, dependencies_data, paths_data] =
+        let [components_data, globals_data, events_data, systems_data, dependencies_data, paths_data, crates_data] =
             [
                 items
                     .components
-                    .map_vec(|v| v.join_map(|c| c.path.path_from(0, crates)[1..].join("::"), ",")),
+                    .map_vec(|v| v.join_map(|c| c.path.path[1..].join("::"), ",")),
                 items
                     .globals
-                    .map_vec(|v| v.join_map(|g| g.path.path_from(0, crates)[1..].join("::"), ",")),
+                    .map_vec(|v| v.join_map(|g| g.path.path[1..].join("::"), ",")),
                 items.events.map_vec(|v| {
                     v.join_map(
-                        |e| {
-                            format!(
-                                "{}({})",
-                                e.path.path_from(0, crates)[1..].join("::"),
-                                e.variants.join(",")
-                            )
-                        },
+                        |e| format!("{}({})", e.path.path[1..].join("::"), e.variants.join(",")),
                         ",",
                     )
                 }),
@@ -91,6 +86,17 @@ impl ItemData {
                         .engine_paths
                         .join_map(|ep| ep.path_from(cr.cr_idx, crates).join("::"), ",")
                 }),
+                crates.map_vec(|cr| {
+                    format!(
+                        "{}",
+                        Path {
+                            cr_idx: cr.cr_idx,
+                            path: vec![cr.cr_name.to_string()],
+                        }
+                        .path_from(0, crates)
+                        .join("::")
+                    )
+                }),
             ]
             .map(|v| {
                 if let Some(s) = v.iter().find(|s| s.contains(SEP)) {
@@ -106,6 +112,7 @@ impl ItemData {
             systems_data,
             dependencies_data,
             paths_data,
+            crates_data,
         }
     }
 
@@ -113,13 +120,14 @@ impl ItemData {
         fs::write(
             std::env::temp_dir().join(DATA_FILE),
             format!(
-                "{}\n{}\n{}\n{}\n{}\n{}",
+                "{}\n{}\n{}\n{}\n{}\n{}\n{}",
                 &self.components_data,
                 &self.globals_data,
                 &self.events_data,
                 &self.systems_data,
                 &self.dependencies_data,
-                &self.paths_data
+                &self.paths_data,
+                &self.crates_data,
             ),
         )
         .expect("Could not write to data file");

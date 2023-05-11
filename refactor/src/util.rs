@@ -1,4 +1,7 @@
-use std::path::PathBuf;
+use std::{
+    iter::{Enumerate, Map},
+    path::PathBuf,
+};
 
 // Traits for calling except() with a String (i.e. with format!())
 pub trait Catch<T> {
@@ -35,22 +38,75 @@ impl<T> Get<T> for Result<T, T> {
 
 // Trait for mapping Vec elements to strings and joining them
 pub trait JoinMap<T> {
-    fn map_vec<U>(&self, f: impl FnMut(&T) -> U) -> Vec<U>;
+    fn map_vec<U, F>(&self, f: F) -> Vec<U>
+    where
+        F: FnMut(&T) -> U;
 
-    fn join_map(&self, f: impl FnMut(&T) -> String, sep: &str) -> String {
+    fn join_map<F>(&self, f: F, sep: &str) -> String
+    where
+        F: FnMut(&T) -> String,
+    {
         self.map_vec(f).join(sep)
     }
 }
 
 impl<T> JoinMap<T> for Vec<T> {
-    fn map_vec<U>(&self, f: impl FnMut(&T) -> U) -> Vec<U> {
+    fn map_vec<U, F>(&self, f: F) -> Vec<U>
+    where
+        F: FnMut(&T) -> U,
+    {
         self.iter().map(f).collect()
     }
 }
 
 impl<T, const N: usize> JoinMap<T> for [T; N] {
-    fn map_vec<U>(&self, f: impl FnMut(&T) -> U) -> Vec<U> {
+    fn map_vec<U, F>(&self, f: F) -> Vec<U>
+    where
+        F: FnMut(&T) -> U,
+    {
         self.iter().map(f).collect()
+    }
+}
+
+pub trait JoinMapInto<T> {
+    fn map_vec<U, F>(self, f: F) -> Vec<U>
+    where
+        F: FnMut(T) -> U;
+
+    fn join_map<F>(self, f: F, sep: &str) -> String
+    where
+        F: FnMut(T) -> String;
+}
+
+impl<'a, T> JoinMapInto<&'a T> for core::slice::Iter<'a, T> {
+    fn map_vec<U, F>(self, f: F) -> Vec<U>
+    where
+        F: FnMut(&'a T) -> U,
+    {
+        self.map(f).collect()
+    }
+
+    fn join_map<F>(self, f: F, sep: &str) -> String
+    where
+        F: FnMut(&'a T) -> String,
+    {
+        self.map_vec(f).join(sep)
+    }
+}
+
+impl<'a, T, Iter: Iterator<Item = &'a T>> JoinMapInto<(usize, &'a T)> for Enumerate<Iter> {
+    fn map_vec<U, F>(self, f: F) -> Vec<U>
+    where
+        F: FnMut((usize, &'a T)) -> U,
+    {
+        self.map(f).collect()
+    }
+
+    fn join_map<F>(self, f: F, sep: &str) -> String
+    where
+        F: FnMut((usize, &'a T)) -> String,
+    {
+        self.map_vec(f).join(sep)
     }
 }
 

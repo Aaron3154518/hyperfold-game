@@ -24,13 +24,14 @@ pub enum Data {
     Systems,
     Dependencies,
     EnginePaths,
+    CratePaths,
 }
 
-const ENGINE_PATHS: usize = Data::EnginePaths as usize;
+pub const NUM_DATA_LINES: usize = 7;
 
 #[derive(Debug)]
 pub struct Decoder {
-    data: [Vec<String>; 6],
+    data: [Vec<String>; NUM_DATA_LINES],
 }
 
 impl Decoder {
@@ -158,6 +159,11 @@ impl Decoder {
         })
     }
 
+    fn get_crate_paths(&self) -> Vec<syn::Path> {
+        self.data[Data::CratePaths as usize]
+            .map_vec(|p| syn::parse_str(&p).catch(format!("Could not parse path: {}", p)))
+    }
+
     fn codegen_dep(&self, cr_idx: usize, deps: Vec<Dependency>) -> TokenStream {
         let engine_paths = self.get_engine_paths(cr_idx);
         let ns = format_ident!("{}", NAMESPACE);
@@ -187,7 +193,6 @@ impl Decoder {
             None => quote!(pub trait #add_comp {}),
         };
 
-        // TODO:
         // Aggregate AddEvent traits and dependencies
         let add_event = format_ident!("{}", EnginePaths::AddEvent.get_type());
         let add_event_tr = &engine_paths[EnginePaths::AddEvent as usize];
@@ -210,23 +215,36 @@ impl Decoder {
         };
 
         quote!(
-            pub mod #ns {
-                #(pub use #dep_aliases;)*
-                #comp_code
-                #event_code
-            }
+            #(pub use #dep_aliases;)*
+            #comp_code
+            #event_code
         )
     }
 
-    fn codegen_entry(&self) -> TokenStream {
-        quote!()
+    fn codegen_entry(&self, cr_idx: usize, deps: Vec<Dependency>) -> TokenStream {
+        // Use statements and traits
+        let deps_code = self.codegen_dep(cr_idx, deps);
+
+        let crate_paths = self.get_crate_paths();
+
+        // Component manager
+
+        quote!(
+            #deps_code
+        )
     }
 
     pub fn codegen(&self, dir: PathBuf) -> TokenStream {
+        let ns = format_ident!("{}", NAMESPACE);
         let (cr_idx, deps) = self.get_dependencies(dir);
-        match cr_idx {
-            0 => self.codegen_entry(),
+        let code = match cr_idx {
+            0 => self.codegen_entry(cr_idx, deps),
             _ => self.codegen_dep(cr_idx, deps),
-        }
+        };
+        quote!(
+            pub mod #ns {
+                #code
+            }
+        )
     }
 }

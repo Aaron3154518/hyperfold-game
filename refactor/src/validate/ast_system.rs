@@ -252,7 +252,7 @@ impl System {
         let mut errs = Vec::new();
         let data = format!(
             "{}({})",
-            self.path.path_from(0, crates).join("::"),
+            self.path.path[1..].join("::"),
             self.args
                 .join_map(|a| a.validate_to_data(paths, items, &mut errs), ",")
         );

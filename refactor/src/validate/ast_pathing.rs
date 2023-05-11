@@ -10,6 +10,10 @@ use super::constants::NAMESPACE;
 
 impl Path {
     pub fn path_from(&self, cr_idx: usize, crates: &Vec<ItemsCrate>) -> Vec<String> {
+        if cr_idx == self.cr_idx {
+            return self.path.to_vec();
+        }
+
         let start_dep = Dependency {
             cr_idx: cr_idx,
             cr_alias: String::new(),
