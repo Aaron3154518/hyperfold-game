@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::{
     parse::{
         ast_crate::Crate,
@@ -48,6 +50,7 @@ pub struct Dependency {
 // Resolve macro paths - convert to engine items
 #[derive(Debug)]
 pub struct ItemsCrate {
+    pub dir: PathBuf,
     pub cr_name: String,
     pub cr_idx: usize,
     pub components: Vec<Component>,
@@ -60,6 +63,7 @@ pub struct ItemsCrate {
 impl ItemsCrate {
     pub fn new() -> Self {
         Self {
+            dir: PathBuf::new(),
             cr_name: String::new(),
             cr_idx: 0,
             components: Vec::new(),
@@ -71,6 +75,7 @@ impl ItemsCrate {
     }
 
     pub fn parse_crate(&mut self, cr: &Crate, paths: &Paths, crates: &Vec<Crate>) {
+        self.dir = cr.dir.to_owned();
         self.cr_name = cr.name.to_string();
         self.cr_idx = cr.idx;
         self.dependencies = cr

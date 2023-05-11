@@ -57,12 +57,12 @@ impl ItemData {
             items
                 .components
                 .iter()
-                .map(|v| v.join_map(|c| c.path.root_path(crates).join("::"), ","))
+                .map(|v| v.join_map(|c| c.path.root_path(crates)[1..].join("::"), ","))
                 .collect(),
             items
                 .globals
                 .iter()
-                .map(|v| v.join_map(|g| g.path.root_path(crates).join("::"), ","))
+                .map(|v| v.join_map(|g| g.path.root_path(crates)[1..].join("::"), ","))
                 .collect(),
             items
                 .events
@@ -72,7 +72,7 @@ impl ItemData {
                         |e| {
                             format!(
                                 "{}({})",
-                                e.path.root_path(crates).join("::"),
+                                e.path.root_path(crates)[1..].join("::"),
                                 e.variants.join(",")
                             )
                         },
@@ -92,7 +92,7 @@ impl ItemData {
                 .map(|cr| {
                     format!(
                         "{}:{}",
-                        cr.cr_name,
+                        cr.dir.display(),
                         cr.dependencies
                             .join_map(|d| format!("{}:{}", d.cr_alias, d.cr_idx), ",")
                     )

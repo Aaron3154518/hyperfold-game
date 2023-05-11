@@ -6,9 +6,13 @@ use crate::{
         ast_paths::Paths,
     },
     util::JoinMap,
+    validate::constants::{component_var, event_var},
 };
 
-use super::ast_item_list::ItemList;
+use super::{
+    ast_item_list::ItemList,
+    constants::{global_var, EID},
+};
 
 impl FnArg {
     // Convert to data
@@ -134,13 +138,13 @@ impl FnArg {
             .map(|_| {
                 self.validate_ref(1, errs);
                 self.validate_mut(false, errs);
-                "id".to_string()
+                EID.to_string()
             })
             // Component
             .or_else(|| {
                 self.to_component(items).map(|(cr_i, c_i, _)| {
                     self.validate_ref(1, errs);
-                    format!("c{}:{}", cr_i, c_i)
+                    component_var(cr_i, c_i)
                 })
             })
             // Global
@@ -150,7 +154,7 @@ impl FnArg {
                     if g_args.is_const {
                         self.validate_mut(false, errs);
                     }
-                    format!("g{}:{}", cr_i, g_i)
+                    global_var(cr_i, g_i)
                 })
             })
             // Event
@@ -158,7 +162,7 @@ impl FnArg {
                 self.to_event(items).map(|(cr_i, e_i, v_i)| {
                     self.validate_ref(1, errs);
                     self.validate_mut(false, errs);
-                    format!("e{}:{}:{}", cr_i, e_i, v_i)
+                    event_var(cr_i, e_i, v_i)
                 })
             })
             // Trait
@@ -166,7 +170,7 @@ impl FnArg {
                 // This assumes the traits are all at the beginning of the globals list
                 self.to_trait(items).map(|(cr_i, g_i)| {
                     self.validate_ref(1, errs);
-                    format!("g{}:{}", cr_i, g_i)
+                    global_var(cr_i, g_i)
                 })
             })
             // Label
@@ -185,7 +189,7 @@ impl FnArg {
                                     ));
                                     String::new()
                                 },
-                                |(cr_i, c_i, _)| format!("{}:{}", cr_i, c_i)
+                                |(cr_i, c_i, _)| component_var(cr_i, c_i)
                             ),
                             ","
                         )
@@ -204,11 +208,15 @@ impl FnArg {
                                 .map(|_| {
                                     a.validate_ref(1, errs);
                                     a.validate_mut(false, errs);
-                                    "id".to_string()
+                                    EID.to_string()
                                 })
                                 .or_else(|| a.to_component(items).map(|(cr_i, c_i, _)| {
                                     a.validate_ref(1, errs);
-                                    format!("{}{}:{}", if a.mutable { "m" } else { "" }, cr_i, c_i)
+                                    format!(
+                                        "{}{}",
+                                        if a.mutable { "m" } else { "" },
+                                        component_var(cr_i, c_i)
+                                    )
                                 }))
                                 .map_or_else(
                                     || {

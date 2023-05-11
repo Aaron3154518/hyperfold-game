@@ -11,3 +11,7 @@ pub type AndLabels<T> = PhantomData<T>;
 pub type OrLabels<T> = PhantomData<T>;
 pub type NandLabels<T> = PhantomData<T>;
 pub type NorLabels<T> = PhantomData<T>;
+
+pub trait AddComponent<T> {
+    fn add_component(&mut self, e: Entity, t: T);
+}
