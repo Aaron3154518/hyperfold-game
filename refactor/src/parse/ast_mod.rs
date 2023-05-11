@@ -66,6 +66,7 @@ pub struct Mod {
     pub marked: Vec<MarkedItem>,
 }
 
+// TODO: ignore private mods
 // Pass 1: parsing
 impl Mod {
     pub fn new(dir: PathBuf, path: Vec<String>, ty: ModType) -> Self {

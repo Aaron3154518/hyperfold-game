@@ -6,11 +6,15 @@ use regex::Regex;
 
 use crate::{
     resolve::ast_paths::{EnginePaths, NUM_ENGINE_PATHS},
-    util::{Catch, SplitCollect},
+    util::{Catch, JoinMap, SplitCollect},
     validate::constants::{component_var, DATA_FILE, NAMESPACE, SEP},
 };
 
-use super::{component::Component, dependency::Dependency};
+use super::{
+    component::Component,
+    dependency::Dependency,
+    event::{self, Event},
+};
 
 #[derive(Copy, Clone, Debug)]
 pub enum Data {
@@ -62,6 +66,30 @@ impl Decoder {
                     ty: syn::parse_str(format!("{}::{}", cr_alias, c).as_str())
                         .catch(format!("Could not parse type: {}", c)),
                     var: format_ident!("{}", component_var(cr_idx, i)),
+                })
+                .collect(),
+        }
+    }
+
+    fn get_events(&self, cr_idx: usize, cr_alias: String) -> Vec<Event> {
+        let event_regex = Regex::new(r"(?P<type>\w+(::\w+)*)\((?P<varis>(\w+(,\w+)*)?)\)")
+            .expect("Could not parse event regex");
+        match self.get_crate_data(Data::Events, cr_idx).as_str() {
+            "" => Vec::new(),
+            data => event_regex
+                .captures_iter(data)
+                .map(|c| {
+                    c.name("type")
+                        .zip(c.name("varis"))
+                        .map(|(ty, varis)| Event {
+                            ty: syn::parse_str(format!("{}::{}", cr_alias, ty.as_str()).as_str())
+                                .catch(format!("Could not parse type: {}", ty.as_str())),
+                            variants: match varis.as_str() {
+                                "" => vec![],
+                                varis => varis.split(",").map(|s| format_ident!("{}", s)).collect(),
+                            },
+                        })
+                        .catch(format!("Could not parse event: {}", data))
                 })
                 .collect(),
         }
@@ -141,28 +169,51 @@ impl Decoder {
         // Aggregate AddComponent traits and dependencies
         let add_comp = format_ident!("{}", EnginePaths::AddComponent.get_type());
         let add_comp_tr = &engine_paths[EnginePaths::AddComponent as usize];
-        let comp_traits = match self
+        let mut comp_trs = self
             .get_components(cr_idx, "crate".to_string())
             .into_iter()
-            .map(|c| c.ty)
-            .collect::<Vec<_>>()
-            .split_first()
-        {
+            .map(|c| {
+                let c_ty = c.ty;
+                quote!(#add_comp_tr<#c_ty>)
+            })
+            .collect::<Vec<_>>();
+        comp_trs.append(&mut dep_aliases.map_vec(|da| quote!(#da::#ns::#add_comp)));
+        let comp_code = match comp_trs.split_first() {
             Some((first, tail)) => {
-                quote!(pub trait #add_comp: #add_comp_tr<#first> #(+#add_comp_tr<#tail>)* #(+#dep_aliases::#ns::#add_comp)* {})
+                quote!(
+                    pub trait #add_comp: #first #(+#tail)* {}
+                )
             }
-            None => quote!(
-                pub trait #add_comp {}
-            ),
+            None => quote!(pub trait #add_comp {}),
         };
 
         // TODO:
         // Aggregate AddEvent traits and dependencies
+        let add_event = format_ident!("{}", EnginePaths::AddEvent.get_type());
+        let add_event_tr = &engine_paths[EnginePaths::AddEvent as usize];
+        let mut event_trs = self
+            .get_events(cr_idx, "crate".to_string())
+            .into_iter()
+            .map(|e| {
+                let e_ty = e.ty;
+                quote!(#add_event_tr<#e_ty>)
+            })
+            .collect::<Vec<_>>();
+        event_trs.append(&mut dep_aliases.map_vec(|da| quote!(#da::#ns::#add_event)));
+        let event_code = match event_trs.split_first() {
+            Some((first, tail)) => {
+                quote!(
+                    pub trait #add_event: #first #(+#tail)* {}
+                )
+            }
+            None => quote!(pub trait #add_event {}),
+        };
 
         quote!(
             pub mod #ns {
                 #(pub use #dep_aliases;)*
-                #comp_traits
+                #comp_code
+                #event_code
             }
         )
     }

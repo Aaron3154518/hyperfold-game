@@ -35,7 +35,7 @@ impl<T> Get<T> for Result<T, T> {
 
 // Trait for mapping Vec elements to strings and joining them
 pub trait JoinMap<T> {
-    fn map_vec(&self, f: impl FnMut(&T) -> String) -> Vec<String>;
+    fn map_vec<U>(&self, f: impl FnMut(&T) -> U) -> Vec<U>;
 
     fn join_map(&self, f: impl FnMut(&T) -> String, sep: &str) -> String {
         self.map_vec(f).join(sep)
@@ -43,13 +43,13 @@ pub trait JoinMap<T> {
 }
 
 impl<T> JoinMap<T> for Vec<T> {
-    fn map_vec(&self, f: impl FnMut(&T) -> String) -> Vec<String> {
+    fn map_vec<U>(&self, f: impl FnMut(&T) -> U) -> Vec<U> {
         self.iter().map(f).collect()
     }
 }
 
 impl<T, const N: usize> JoinMap<T> for [T; N] {
-    fn map_vec(&self, f: impl FnMut(&T) -> String) -> Vec<String> {
+    fn map_vec<U>(&self, f: impl FnMut(&T) -> U) -> Vec<U> {
         self.iter().map(f).collect()
     }
 }

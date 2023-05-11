@@ -6,11 +6,11 @@ pub enum EnginePaths {
     AddEvent,
 }
 
-pub const NUM_ENGINE_PATHS: usize = 1;
+pub const NUM_ENGINE_PATHS: usize = 2;
 
 impl EnginePaths {
     pub fn get_variants() -> [EnginePaths; NUM_ENGINE_PATHS] {
-        [EnginePaths::AddComponent]
+        [EnginePaths::AddComponent, EnginePaths::AddEvent]
     }
 
     pub fn get_type(&self) -> String {
@@ -45,7 +45,7 @@ pub struct Paths {
     pub nand_labels: Path,
     pub nor_labels: Path,
     // Trait paths
-    pub engine_paths: [Path; 1],
+    pub engine_paths: [Path; NUM_ENGINE_PATHS],
 }
 
 impl Paths {
