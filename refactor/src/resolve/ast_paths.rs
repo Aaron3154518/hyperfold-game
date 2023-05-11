@@ -3,6 +3,7 @@ use super::ast_resolve::Path;
 #[derive(Clone, Copy, Debug)]
 pub enum EnginePaths {
     AddComponent,
+    AddEvent,
 }
 
 pub const NUM_ENGINE_PATHS: usize = 1;
@@ -12,13 +13,19 @@ impl EnginePaths {
         [EnginePaths::AddComponent]
     }
 
-    pub fn get_path(&self) -> Vec<String> {
+    pub fn get_type(&self) -> String {
         match self {
-            EnginePaths::AddComponent => vec!["crate", "AddComponent"],
+            EnginePaths::AddComponent => "AddComponent",
+            EnginePaths::AddEvent => "AddEvent",
         }
-        .iter()
-        .map(|s| s.to_string())
-        .collect()
+        .to_string()
+    }
+
+    pub fn get_path(&self) -> Vec<String> {
+        vec!["crate".to_string(), self.get_type()]
+            .iter()
+            .map(|s| s.to_string())
+            .collect()
     }
 }
 

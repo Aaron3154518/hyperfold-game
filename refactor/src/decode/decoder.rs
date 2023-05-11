@@ -1,12 +1,13 @@
 use std::{array, fs, path::PathBuf};
 
-use quote::{format_ident, ToTokens};
+use proc_macro2::TokenStream;
+use quote::{format_ident, quote, ToTokens};
 use regex::Regex;
 
 use crate::{
     resolve::ast_paths::{EnginePaths, NUM_ENGINE_PATHS},
     util::{Catch, SplitCollect},
-    validate::constants::{component_var, DATA_FILE, SEP},
+    validate::constants::{component_var, DATA_FILE, NAMESPACE, SEP},
 };
 
 use super::{component::Component, dependency::Dependency};
@@ -73,62 +74,104 @@ impl Decoder {
             .expect("Could not create dependency regex");
         let dep_regex =
             Regex::new(r"(?P<alias>\w+):(?P<idx>\d+)").expect("Could not create dependency regex");
-        self.data[Data::Dependencies as usize]
+
+        let crates = self.data[Data::Dependencies as usize]
             .iter()
-            .enumerate()
-            .find_map(|(i, deps)| {
+            .map(|deps| {
                 full_regex
                     .captures(deps)
                     .and_then(|c| c.name("file").zip(c.name("deps")))
-                    .and_then(|(path, deps)| {
-                        (dir == PathBuf::from(path.as_str())).then(|| {
-                            (
-                                i,
-                                deps.as_str()
-                                    .split(",")
-                                    .map(|dep| {
-                                        dep_regex
-                                            .captures(dep)
-                                            .and_then(|c| c.name("alias").zip(c.name("idx")))
-                                            .map(|(alias, idx)| Dependency {
-                                                cr_idx: idx
-                                                    .as_str()
-                                                    .parse()
-                                                    .expect("Could not parse dependency index"),
-                                                alias: alias.as_str().to_string(),
-                                            })
-                                            .catch(format!("Could not parse dependency: {}", dep))
-                                    })
-                                    .collect(),
-                            )
-                        })
+                    .map(|(path, deps)| {
+                        (
+                            PathBuf::from(path.as_str()),
+                            deps.as_str().split_collect(","),
+                        )
                     })
+                    .catch(format!("Could not parse dependency: {}", deps))
+            })
+            .collect::<Vec<_>>();
+
+        crates
+            .iter()
+            .enumerate()
+            .find_map(|(i, (path, deps))| {
+                (&dir == path).then(|| {
+                    (
+                        i,
+                        deps.iter()
+                            .map(|dep| {
+                                dep_regex
+                                    .captures(dep)
+                                    .and_then(|c| c.name("alias").zip(c.name("idx")))
+                                    .map(|(alias, idx)| Dependency {
+                                        cr_idx: idx
+                                            .as_str()
+                                            .parse()
+                                            .expect("Could not parse dependency index"),
+                                        alias: alias.as_str().to_string(),
+                                    })
+                                    .catch(format!("Could not parse dependency: {}", dep))
+                            })
+                            .collect(),
+                    )
+                })
             })
             .catch(format!("Could not locate dependency: {}", dir.display()))
     }
 
-    fn get_engine_paths(&self, cr_idx: usize) -> [Vec<String>; NUM_ENGINE_PATHS] {
+    fn get_engine_paths(&self, cr_idx: usize) -> [syn::Type; NUM_ENGINE_PATHS] {
         let mut data = self.data[Data::EnginePaths as usize][cr_idx].split(",");
         array::from_fn(|i| {
-            data.next()
-                .catch(format!("Could not get engine path: {}", i))
-                .split_collect("::")
+            syn::parse_str(
+                data.next()
+                    .catch(format!("Could not get engine path: {}", i)),
+            )
+            .catch(format!("Could not parse engine type: {}", i))
         })
     }
 
-    fn codegen_dep(&self, cr_idx: usize, deps: Vec<Dependency>) -> String {
-        let components = self.get_components(cr_idx, "crate".to_string());
+    fn codegen_dep(&self, cr_idx: usize, deps: Vec<Dependency>) -> TokenStream {
         let engine_paths = self.get_engine_paths(cr_idx);
-        println!("{:#?}", engine_paths);
-        // TODO: uses and traits
-        String::new()
+        let ns = format_ident!("{}", NAMESPACE);
+        let dep_aliases = deps
+            .iter()
+            .map(|d| format_ident!("{}", d.alias))
+            .collect::<Vec<_>>();
+
+        // Aggregate AddComponent traits and dependencies
+        let add_comp = format_ident!("{}", EnginePaths::AddComponent.get_type());
+        let add_comp_tr = &engine_paths[EnginePaths::AddComponent as usize];
+        let comp_traits = match self
+            .get_components(cr_idx, "crate".to_string())
+            .into_iter()
+            .map(|c| c.ty)
+            .collect::<Vec<_>>()
+            .split_first()
+        {
+            Some((first, tail)) => {
+                quote!(pub trait #add_comp: #add_comp_tr<#first> #(+#add_comp_tr<#tail>)* #(+#dep_aliases::#ns::#add_comp)* {})
+            }
+            None => quote!(
+                pub trait #add_comp {}
+            ),
+        };
+
+        // TODO:
+        // Aggregate AddEvent traits and dependencies
+
+        quote!(
+            pub mod #ns {
+                #(pub use #dep_aliases;)*
+                #comp_traits
+            }
+        )
     }
 
-    fn codegen_entry(&self) -> String {
-        String::new()
+    fn codegen_entry(&self) -> TokenStream {
+        quote!()
     }
 
-    pub fn codegen(&self, dir: PathBuf) -> String {
+    pub fn codegen(&self, dir: PathBuf) -> TokenStream {
         let (cr_idx, deps) = self.get_dependencies(dir);
         match cr_idx {
             0 => self.codegen_entry(),

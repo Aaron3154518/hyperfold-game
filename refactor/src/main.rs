@@ -97,5 +97,8 @@ fn main() {
 
     let decoder = Decoder::new();
     // println!("{:#?}", decoder);
-    println!("{}", decoder.codegen(PathBuf::from("./test/a/b")));
+    println!(
+        "{}",
+        decoder.codegen(PathBuf::from("./test/a/b")).to_string()
+    );
 }
