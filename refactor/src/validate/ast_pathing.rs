@@ -9,13 +9,9 @@ use crate::{
 use super::constants::NAMESPACE;
 
 impl Path {
-    pub fn root_path(&self, crates: &Vec<ItemsCrate>) -> Vec<String> {
-        if self.cr_idx == 0 {
-            return self.path.to_vec();
-        }
-
+    pub fn path_from(&self, cr_idx: usize, crates: &Vec<ItemsCrate>) -> Vec<String> {
         let start_dep = Dependency {
-            cr_idx: 0,
+            cr_idx: cr_idx,
             cr_alias: String::new(),
         };
 

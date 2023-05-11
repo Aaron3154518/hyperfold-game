@@ -35,12 +35,22 @@ impl<T> Get<T> for Result<T, T> {
 
 // Trait for mapping Vec elements to strings and joining them
 pub trait JoinMap<T> {
-    fn join_map(&self, f: impl FnMut(&T) -> String, sep: &str) -> String;
+    fn map_vec(&self, f: impl FnMut(&T) -> String) -> Vec<String>;
+
+    fn join_map(&self, f: impl FnMut(&T) -> String, sep: &str) -> String {
+        self.map_vec(f).join(sep)
+    }
 }
 
 impl<T> JoinMap<T> for Vec<T> {
-    fn join_map(&self, f: impl FnMut(&T) -> String, sep: &str) -> String {
-        self.iter().map(f).collect::<Vec<_>>().join(sep)
+    fn map_vec(&self, f: impl FnMut(&T) -> String) -> Vec<String> {
+        self.iter().map(f).collect()
+    }
+}
+
+impl<T, const N: usize> JoinMap<T> for [T; N] {
+    fn map_vec(&self, f: impl FnMut(&T) -> String) -> Vec<String> {
+        self.iter().map(f).collect()
     }
 }
 
@@ -80,6 +90,12 @@ pub trait SplitCollect {
 }
 
 impl SplitCollect for String {
+    fn split_collect(&self, sep: &str) -> Vec<String> {
+        self.split(sep).map(|s| s.to_string()).collect()
+    }
+}
+
+impl SplitCollect for str {
     fn split_collect(&self, sep: &str) -> Vec<String> {
         self.split(sep).map(|s| s.to_string()).collect()
     }

@@ -58,55 +58,41 @@ impl ItemData {
             [
                 items
                     .components
-                    .iter()
-                    .map(|v| v.join_map(|c| c.path.root_path(crates)[1..].join("::"), ","))
-                    .collect(),
+                    .map_vec(|v| v.join_map(|c| c.path.path_from(0, crates)[1..].join("::"), ",")),
                 items
                     .globals
-                    .iter()
-                    .map(|v| v.join_map(|g| g.path.root_path(crates)[1..].join("::"), ","))
-                    .collect(),
-                items
-                    .events
-                    .iter()
-                    .map(|v| {
-                        v.join_map(
-                            |e| {
-                                format!(
-                                    "{}({})",
-                                    e.path.root_path(crates)[1..].join("::"),
-                                    e.variants.join(",")
-                                )
-                            },
-                            ",",
-                        )
-                    })
-                    .collect(),
-                crates
-                    .iter()
-                    .map(|cr| {
-                        cr.systems
-                            .join_map(|s| s.validate_to_data(paths, crates, &items), ",")
-                    })
-                    .collect(),
-                crates
-                    .iter()
-                    .map(|cr| {
-                        format!(
-                            "{}({})",
-                            cr.dir.display(),
-                            cr.dependencies
-                                .join_map(|d| format!("{}:{}", d.cr_alias, d.cr_idx), ",")
-                        )
-                    })
-                    .collect(),
-                paths
-                    .engine_paths
-                    .iter()
-                    .map(|ep| ep.root_path(crates).join("::"))
-                    .collect(),
+                    .map_vec(|v| v.join_map(|g| g.path.path_from(0, crates)[1..].join("::"), ",")),
+                items.events.map_vec(|v| {
+                    v.join_map(
+                        |e| {
+                            format!(
+                                "{}({})",
+                                e.path.path_from(0, crates)[1..].join("::"),
+                                e.variants.join(",")
+                            )
+                        },
+                        ",",
+                    )
+                }),
+                crates.map_vec(|cr| {
+                    cr.systems
+                        .join_map(|s| s.validate_to_data(paths, crates, &items), ",")
+                }),
+                crates.map_vec(|cr| {
+                    format!(
+                        "{}({})",
+                        cr.dir.display(),
+                        cr.dependencies
+                            .join_map(|d| format!("{}:{}", d.cr_alias, d.cr_idx), ",")
+                    )
+                }),
+                crates.map_vec(|cr| {
+                    paths
+                        .engine_paths
+                        .join_map(|ep| ep.path_from(cr.cr_idx, crates).join("::"), ",")
+                }),
             ]
-            .map(|v: Vec<_>| {
+            .map(|v| {
                 if let Some(s) = v.iter().find(|s| s.contains(SEP)) {
                     panic!("Found separator \"{}\" in data string: \"{}\"", SEP, s)
                 }

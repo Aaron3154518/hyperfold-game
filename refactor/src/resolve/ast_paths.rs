@@ -46,19 +46,19 @@ impl Paths {
         Self {
             component: Path {
                 cr_idx: engine_cr_idx,
-                path: vec!["engine".to_string(), "component".to_string()],
+                path: vec!["crate".to_string(), "component".to_string()],
             },
             global: Path {
                 cr_idx: engine_cr_idx,
-                path: vec!["engine".to_string(), "global".to_string()],
+                path: vec!["crate".to_string(), "global".to_string()],
             },
             event: Path {
                 cr_idx: engine_cr_idx,
-                path: vec!["engine".to_string(), "event".to_string()],
+                path: vec!["crate".to_string(), "event".to_string()],
             },
             system: Path {
                 cr_idx: engine_cr_idx,
-                path: vec!["engine".to_string(), "system".to_string()],
+                path: vec!["crate".to_string(), "system".to_string()],
             },
             eid: Path {
                 cr_idx: engine_cr_idx,

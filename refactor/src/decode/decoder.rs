@@ -1,6 +1,6 @@
 use std::{array, fs, path::PathBuf};
 
-use quote::format_ident;
+use quote::{format_ident, ToTokens};
 use regex::Regex;
 
 use crate::{
@@ -107,17 +107,20 @@ impl Decoder {
             .catch(format!("Could not locate dependency: {}", dir.display()))
     }
 
-    fn get_engine_paths(&self) -> [Vec<String>; NUM_ENGINE_PATHS] {
-        let data = &self.data[Data::EnginePaths as usize];
-        EnginePaths::get_variants().map(|v| data[v as usize].split_collect("::"))
+    fn get_engine_paths(&self, cr_idx: usize) -> [Vec<String>; NUM_ENGINE_PATHS] {
+        let mut data = self.data[Data::EnginePaths as usize][cr_idx].split(",");
+        array::from_fn(|i| {
+            data.next()
+                .catch(format!("Could not get engine path: {}", i))
+                .split_collect("::")
+        })
     }
 
     fn codegen_dep(&self, cr_idx: usize, deps: Vec<Dependency>) -> String {
         let components = self.get_components(cr_idx, "crate".to_string());
-        let engine_paths = self.get_engine_paths();
+        let engine_paths = self.get_engine_paths(cr_idx);
         println!("{:#?}", engine_paths);
-        // TODO: How to access engine?
-
+        // TODO: uses and traits
         String::new()
     }
 
@@ -127,7 +130,6 @@ impl Decoder {
 
     pub fn codegen(&self, dir: PathBuf) -> String {
         let (cr_idx, deps) = self.get_dependencies(dir);
-        println!("{:#?}\n{:#?}", cr_idx, deps);
         match cr_idx {
             0 => self.codegen_entry(),
             _ => self.codegen_dep(cr_idx, deps),

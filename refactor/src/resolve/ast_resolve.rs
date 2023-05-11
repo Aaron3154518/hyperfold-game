@@ -24,22 +24,27 @@ impl Path {
 // Err means:
 // 1) Not from a valid crate
 // 2) resolve_mod() returns Err
-pub fn resolve(path: Vec<String>, cr: &Crate, crates: &Vec<Crate>) -> Result<Path, Path> {
+pub fn resolve(mut path: Vec<String>, cr: &Crate, crates: &Vec<Crate>) -> Result<Path, Path> {
     // println!("Resolve: {}", path.join("::"));
     let cr_idx = cr.idx;
     match path.first() {
         Some(p) => {
-            match match p.as_str() {
+            match p.as_str() {
                 // Match this crate
-                "crate" => Some(cr),
+                "crate" => Some(resolve_mod(path.to_vec(), 1, cr, &cr.main, crates)),
                 // Match dependency
-                _ => cr.deps.iter().find_map(|(idx, name)| {
-                    (name == p).then_some(crates.get(*idx).expect("Invalid dependency index"))
+                _ => cr.deps.iter().find_map(|(idx, alias)| {
+                    (alias == p).then(|| {
+                        let cr = crates.get(*idx).expect("Invalid dependency index");
+                        resolve(
+                            [vec!["crate".to_string()], path[1..].to_vec()].concat(),
+                            cr,
+                            crates,
+                        )
+                    })
                 }),
-            } {
-                Some(cr) => resolve_mod(path, 1, cr, &cr.main, crates),
-                None => Err(Path { cr_idx, path }),
             }
+            .map_or(Err(Path { cr_idx, path }), |r| r)
         }
         None => Err(Path { cr_idx, path }),
     }
