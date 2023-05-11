@@ -4,7 +4,8 @@ use quote::format_ident;
 use regex::Regex;
 
 use crate::{
-    util::Catch,
+    resolve::ast_paths::{EnginePaths, NUM_ENGINE_PATHS},
+    util::{Catch, SplitCollect},
     validate::constants::{component_var, DATA_FILE, SEP},
 };
 
@@ -17,11 +18,14 @@ pub enum Data {
     Events,
     Systems,
     Dependencies,
+    EnginePaths,
 }
+
+const ENGINE_PATHS: usize = Data::EnginePaths as usize;
 
 #[derive(Debug)]
 pub struct Decoder {
-    data: [Vec<String>; 5],
+    data: [Vec<String>; 6],
 }
 
 impl Decoder {
@@ -47,54 +51,71 @@ impl Decoder {
             .catch(format!("Invalid crate index: {}", cr_idx))
     }
 
+    fn get_components(&self, cr_idx: usize, cr_alias: String) -> Vec<Component> {
+        match self.get_crate_data(Data::Components, cr_idx).as_str() {
+            "" => Vec::new(),
+            data => data
+                .split(",")
+                .enumerate()
+                .map(|(i, c)| Component {
+                    ty: syn::parse_str(format!("{}::{}", cr_alias, c).as_str())
+                        .catch(format!("Could not parse type: {}", c)),
+                    var: format_ident!("{}", component_var(cr_idx, i)),
+                })
+                .collect(),
+        }
+    }
+
     fn get_dependencies(&self, dir: PathBuf) -> (usize, Vec<Dependency>) {
         let dir = fs::canonicalize(dir.to_owned())
             .catch(format!("Could not canoncialize path: {}", dir.display()));
+        let full_regex = Regex::new(r"(?P<file>[^\()]*)\((?P<deps>(\w+:\d+(,\w+:\d+)*)?)\)")
+            .expect("Could not create dependency regex");
         let dep_regex =
-            Regex::new(r"(?P<alias>\w+):(?P<idx>\d+)").expect("Could not crate dependency regex");
+            Regex::new(r"(?P<alias>\w+):(?P<idx>\d+)").expect("Could not create dependency regex");
         self.data[Data::Dependencies as usize]
             .iter()
             .enumerate()
             .find_map(|(i, deps)| {
-                deps.strip_prefix(format!("{}:", dir.display()).as_str())
-                    .map(|deps| {
-                        (
-                            i,
-                            deps.split(",")
-                                .map(|dep| {
-                                    dep_regex
-                                        .captures(dep)
-                                        .and_then(|c| c.name("alias").zip(c.name("idx")))
-                                        .map(|(alias, idx)| Dependency {
-                                            cr_idx: idx
-                                                .as_str()
-                                                .parse()
-                                                .expect("Could not parse dependency index"),
-                                            alias: alias.as_str().to_string(),
-                                        })
-                                        .catch(format!("Could not parse dependency: {}", dep))
-                                })
-                                .collect(),
-                        )
+                full_regex
+                    .captures(deps)
+                    .and_then(|c| c.name("file").zip(c.name("deps")))
+                    .and_then(|(path, deps)| {
+                        (dir == PathBuf::from(path.as_str())).then(|| {
+                            (
+                                i,
+                                deps.as_str()
+                                    .split(",")
+                                    .map(|dep| {
+                                        dep_regex
+                                            .captures(dep)
+                                            .and_then(|c| c.name("alias").zip(c.name("idx")))
+                                            .map(|(alias, idx)| Dependency {
+                                                cr_idx: idx
+                                                    .as_str()
+                                                    .parse()
+                                                    .expect("Could not parse dependency index"),
+                                                alias: alias.as_str().to_string(),
+                                            })
+                                            .catch(format!("Could not parse dependency: {}", dep))
+                                    })
+                                    .collect(),
+                            )
+                        })
                     })
             })
             .catch(format!("Could not locate dependency: {}", dir.display()))
     }
 
-    fn get_components(&self, cr_idx: usize, cr_alias: String) -> Vec<Component> {
-        self.get_crate_data(Data::Components, cr_idx)
-            .split(",")
-            .enumerate()
-            .map(|(i, c)| Component {
-                ty: syn::parse_str(format!("{}::{}", cr_alias, c).as_str())
-                    .catch(format!("Could not parse type: {}", c)),
-                var: format_ident!("{}", component_var(cr_idx, i)),
-            })
-            .collect()
+    fn get_engine_paths(&self) -> [Vec<String>; NUM_ENGINE_PATHS] {
+        let data = &self.data[Data::EnginePaths as usize];
+        EnginePaths::get_variants().map(|v| data[v as usize].split_collect("::"))
     }
 
     fn codegen_dep(&self, cr_idx: usize, deps: Vec<Dependency>) -> String {
         let components = self.get_components(cr_idx, "crate".to_string());
+        let engine_paths = self.get_engine_paths();
+        println!("{:#?}", engine_paths);
         // TODO: How to access engine?
 
         String::new()
@@ -106,6 +127,7 @@ impl Decoder {
 
     pub fn codegen(&self, dir: PathBuf) -> String {
         let (cr_idx, deps) = self.get_dependencies(dir);
+        println!("{:#?}\n{:#?}", cr_idx, deps);
         match cr_idx {
             0 => self.codegen_entry(),
             _ => self.codegen_dep(cr_idx, deps),

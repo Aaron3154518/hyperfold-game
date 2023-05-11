@@ -29,6 +29,7 @@ pub struct ItemData {
     pub events_data: String,
     pub systems_data: String,
     pub dependencies_data: String,
+    pub paths_data: String,
 }
 
 impl ItemData {
@@ -53,58 +54,64 @@ impl ItemData {
         // Collect items
         let items = ItemList::from(crates, &traits);
 
-        let [components_data, globals_data, events_data, systems_data, dependencies_data] = [
-            items
-                .components
-                .iter()
-                .map(|v| v.join_map(|c| c.path.root_path(crates)[1..].join("::"), ","))
-                .collect(),
-            items
-                .globals
-                .iter()
-                .map(|v| v.join_map(|g| g.path.root_path(crates)[1..].join("::"), ","))
-                .collect(),
-            items
-                .events
-                .iter()
-                .map(|v| {
-                    v.join_map(
-                        |e| {
-                            format!(
-                                "{}({})",
-                                e.path.root_path(crates)[1..].join("::"),
-                                e.variants.join(",")
-                            )
-                        },
-                        ",",
-                    )
-                })
-                .collect(),
-            crates
-                .iter()
-                .map(|cr| {
-                    cr.systems
-                        .join_map(|s| s.validate_to_data(paths, crates, &items), ",")
-                })
-                .collect(),
-            crates
-                .iter()
-                .map(|cr| {
-                    format!(
-                        "{}:{}",
-                        cr.dir.display(),
-                        cr.dependencies
-                            .join_map(|d| format!("{}:{}", d.cr_alias, d.cr_idx), ",")
-                    )
-                })
-                .collect(),
-        ]
-        .map(|v: Vec<_>| {
-            if let Some(s) = v.iter().find(|s| s.contains(SEP)) {
-                panic!("Found separator \"{}\" in data string: \"{}\"", SEP, s)
-            }
-            v.join(SEP)
-        });
+        let [components_data, globals_data, events_data, systems_data, dependencies_data, paths_data] =
+            [
+                items
+                    .components
+                    .iter()
+                    .map(|v| v.join_map(|c| c.path.root_path(crates)[1..].join("::"), ","))
+                    .collect(),
+                items
+                    .globals
+                    .iter()
+                    .map(|v| v.join_map(|g| g.path.root_path(crates)[1..].join("::"), ","))
+                    .collect(),
+                items
+                    .events
+                    .iter()
+                    .map(|v| {
+                        v.join_map(
+                            |e| {
+                                format!(
+                                    "{}({})",
+                                    e.path.root_path(crates)[1..].join("::"),
+                                    e.variants.join(",")
+                                )
+                            },
+                            ",",
+                        )
+                    })
+                    .collect(),
+                crates
+                    .iter()
+                    .map(|cr| {
+                        cr.systems
+                            .join_map(|s| s.validate_to_data(paths, crates, &items), ",")
+                    })
+                    .collect(),
+                crates
+                    .iter()
+                    .map(|cr| {
+                        format!(
+                            "{}({})",
+                            cr.dir.display(),
+                            cr.dependencies
+                                .join_map(|d| format!("{}:{}", d.cr_alias, d.cr_idx), ",")
+                        )
+                    })
+                    .collect(),
+                paths
+                    .engine_paths
+                    .iter()
+                    .map(|ep| ep.root_path(crates).join("::"))
+                    .collect(),
+            ]
+            .map(|v: Vec<_>| {
+                if let Some(s) = v.iter().find(|s| s.contains(SEP)) {
+                    panic!("Found separator \"{}\" in data string: \"{}\"", SEP, s)
+                }
+                v.join(SEP)
+            });
 
         Self {
             components_data,
@@ -112,6 +119,7 @@ impl ItemData {
             events_data,
             systems_data,
             dependencies_data,
+            paths_data,
         }
     }
 
@@ -119,12 +127,13 @@ impl ItemData {
         fs::write(
             std::env::temp_dir().join(DATA_FILE),
             format!(
-                "{}\n{}\n{}\n{}\n{}",
+                "{}\n{}\n{}\n{}\n{}\n{}",
                 &self.components_data,
                 &self.globals_data,
                 &self.events_data,
                 &self.systems_data,
                 &self.dependencies_data,
+                &self.paths_data
             ),
         )
         .expect("Could not write to data file");

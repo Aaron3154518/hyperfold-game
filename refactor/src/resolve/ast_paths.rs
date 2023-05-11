@@ -1,5 +1,27 @@
 use super::ast_resolve::Path;
 
+#[derive(Clone, Copy, Debug)]
+pub enum EnginePaths {
+    AddComponent,
+}
+
+pub const NUM_ENGINE_PATHS: usize = 1;
+
+impl EnginePaths {
+    pub fn get_variants() -> [EnginePaths; NUM_ENGINE_PATHS] {
+        [EnginePaths::AddComponent]
+    }
+
+    pub fn get_path(&self) -> Vec<String> {
+        match self {
+            EnginePaths::AddComponent => vec!["crate", "AddComponent"],
+        }
+        .iter()
+        .map(|s| s.to_string())
+        .collect()
+    }
+}
+
 // TODO: easy way to declare hardcoded
 pub struct Paths {
     // Macro paths
@@ -15,6 +37,8 @@ pub struct Paths {
     pub or_labels: Path,
     pub nand_labels: Path,
     pub nor_labels: Path,
+    // Trait paths
+    pub engine_paths: [Path; 1],
 }
 
 impl Paths {
@@ -64,6 +88,10 @@ impl Paths {
                 cr_idx: engine_cr_idx,
                 path: vec!["crate".to_string(), "NorLabels".to_string()],
             },
+            engine_paths: EnginePaths::get_variants().map(|ep| Path {
+                cr_idx: engine_cr_idx,
+                path: ep.get_path(),
+            }),
         }
     }
 }

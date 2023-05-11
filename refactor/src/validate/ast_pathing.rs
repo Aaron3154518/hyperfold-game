@@ -32,6 +32,8 @@ impl Path {
                         use_path.push(d.cr_alias.to_string());
                         use_path.push(NAMESPACE.to_string());
                     }
+                    // Don't include final NAMESPACE
+                    use_path.pop();
                     use_path.extend(self.path[1..].to_vec().into_iter());
                     return use_path;
                 }

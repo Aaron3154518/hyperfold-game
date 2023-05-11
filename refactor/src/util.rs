@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 // Traits for calling except() with a String (i.e. with format!())
 pub trait Catch<T> {
     fn catch(self, err: String) -> T;
@@ -69,6 +71,17 @@ pub trait SplitIter<T, U, V> {
 impl<T, U, V> SplitIter<T, U, V> for (T, U) {
     fn split(&self, f: impl Fn(&T, &U) -> V) -> V {
         f(&self.0, &self.1)
+    }
+}
+
+// Splitting string into list
+pub trait SplitCollect {
+    fn split_collect(&self, sep: &str) -> Vec<String>;
+}
+
+impl SplitCollect for String {
+    fn split_collect(&self, sep: &str) -> Vec<String> {
+        self.split(sep).map(|s| s.to_string()).collect()
     }
 }
 
