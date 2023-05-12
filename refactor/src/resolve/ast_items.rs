@@ -12,7 +12,7 @@ use crate::{
 
 use super::{
     ast_args::{ComponentMacroArgs, GlobalMacroArgs},
-    ast_paths::Paths,
+    ast_paths::EnginePaths,
     ast_resolve::Path,
 };
 
@@ -74,7 +74,12 @@ impl ItemsCrate {
         }
     }
 
-    pub fn parse_crate(&mut self, cr: &Crate, paths: &Paths, crates: &Vec<Crate>) {
+    pub fn parse_crate(
+        &mut self,
+        cr: &Crate,
+        paths: &[Path; EnginePaths::len()],
+        crates: &Vec<Crate>,
+    ) {
         self.dir = cr.dir.to_owned();
         self.cr_name = cr.name.to_string();
         self.cr_idx = cr.idx;
@@ -89,7 +94,13 @@ impl ItemsCrate {
         self.parse_mod(cr, &cr.main, paths, crates);
     }
 
-    pub fn parse_mod(&mut self, cr: &Crate, m: &Mod, paths: &Paths, crates: &Vec<Crate>) {
+    pub fn parse_mod(
+        &mut self,
+        cr: &Crate,
+        m: &Mod,
+        paths: &[Path; EnginePaths::len()],
+        crates: &Vec<Crate>,
+    ) {
         let cr_idx = cr.idx;
 
         for mi in m.marked.iter() {
@@ -97,7 +108,7 @@ impl ItemsCrate {
                 let match_path = resolve_path(path.to_vec(), cr, m, crates).get();
                 match &mi.ty {
                     crate::parse::ast_mod::MarkType::Struct => {
-                        if match_path == paths.component {
+                        if match_path == paths[EnginePaths::MacroComponent as usize] {
                             self.components.push(Component {
                                 path: Path {
                                     cr_idx,
@@ -106,7 +117,7 @@ impl ItemsCrate {
                                 args: ComponentMacroArgs::from(args.to_vec()),
                             });
                             break;
-                        } else if match_path == paths.global {
+                        } else if match_path == paths[EnginePaths::MacroGlobal as usize] {
                             self.globals.push(Global {
                                 path: Path {
                                     cr_idx,
@@ -118,7 +129,7 @@ impl ItemsCrate {
                         }
                     }
                     crate::parse::ast_mod::MarkType::Fn { args } => {
-                        if match_path == paths.system {
+                        if match_path == paths[EnginePaths::MacroSystem as usize] {
                             self.systems.push(System {
                                 path: Path {
                                     cr_idx,
@@ -137,7 +148,7 @@ impl ItemsCrate {
                         }
                     }
                     crate::parse::ast_mod::MarkType::Enum { variants } => {
-                        if match_path == paths.event {
+                        if match_path == paths[EnginePaths::MacroEvent as usize] {
                             self.events.push(Event {
                                 path: Path {
                                     cr_idx,

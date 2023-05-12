@@ -9,7 +9,7 @@ use crate::{
     resolve::{
         ast_args::{ComponentMacroArgs, GlobalMacroArgs},
         ast_items::{Component, Dependency, Event, Global, ItemsCrate, System},
-        ast_paths::Paths,
+        ast_paths::{CrateEnginePaths, EnginePaths, EntryEnginePaths},
         ast_resolve::Path,
     },
     util::{end, Catch, JoinMap, JoinMapInto, NoneOr, SplitIter},
@@ -22,19 +22,26 @@ use super::{
 
 // Pass 3: Item validation
 // Map system arg paths to items
+#[macros::expand_enum]
+#[derive(Copy, Clone, Debug)]
+pub enum Data {
+    Components,
+    Globals,
+    Events,
+    Systems,
+    Dependencies,
+    CrateEnginePaths,
+    EntryEnginePaths,
+    CratePaths,
+}
+
 #[derive(Debug)]
 pub struct ItemData {
-    pub components_data: String,
-    pub globals_data: String,
-    pub events_data: String,
-    pub systems_data: String,
-    pub dependencies_data: String,
-    pub paths_data: String,
-    pub crates_data: String,
+    pub data: [String; Data::len()],
 }
 
 impl ItemData {
-    pub fn validate(paths: &Paths, crates: &mut Vec<ItemsCrate>) -> Self {
+    pub fn validate(paths: &[Path; EnginePaths::len()], crates: &mut Vec<ItemsCrate>) -> Self {
         // Sort in order of crate index
         crates.sort_by_key(|cr| cr.cr_idx);
 
@@ -55,25 +62,25 @@ impl ItemData {
         // Collect items
         let items = ItemList::from(crates, &traits);
 
-        let [components_data, globals_data, events_data, systems_data, dependencies_data, paths_data, crates_data] =
-            [
-                items
+        let data = Data::variants()
+            .map(|dv| match dv {
+                Data::Components => items
                     .components
                     .map_vec(|v| v.join_map(|c| c.path.path[1..].join("::"), ",")),
-                items
+                Data::Globals => items
                     .globals
                     .map_vec(|v| v.join_map(|g| g.path.path[1..].join("::"), ",")),
-                items.events.map_vec(|v| {
+                Data::Events => items.events.map_vec(|v| {
                     v.join_map(
                         |e| format!("{}({})", e.path.path[1..].join("::"), e.variants.join(",")),
                         ",",
                     )
                 }),
-                crates.map_vec(|cr| {
+                Data::Systems => crates.map_vec(|cr| {
                     cr.systems
                         .join_map(|s| s.validate_to_data(paths, crates, &items), ",")
                 }),
-                crates.map_vec(|cr| {
+                Data::Dependencies => crates.map_vec(|cr| {
                     format!(
                         "{}({})",
                         cr.dir.display(),
@@ -81,12 +88,13 @@ impl ItemData {
                             .join_map(|d| format!("{}:{}", d.cr_alias, d.cr_idx), ",")
                     )
                 }),
-                crates.map_vec(|cr| {
-                    paths
-                        .engine_paths
+                Data::CrateEnginePaths => crates.map_vec(|cr| {
+                    CrateEnginePaths::get_paths(&paths)
                         .join_map(|ep| ep.path_from(cr.cr_idx, crates).join("::"), ",")
                 }),
-                crates.map_vec(|cr| {
+                Data::EntryEnginePaths => vec![EntryEnginePaths::get_paths(&paths)
+                    .join_map(|ep| ep.path_from(0, crates).join("::"), ",")],
+                Data::CratePaths => crates.map_vec(|cr| {
                     format!(
                         "{}",
                         Path {
@@ -101,7 +109,7 @@ impl ItemData {
                         .join("::")
                     )
                 }),
-            ]
+            })
             .map(|v| {
                 if let Some(s) = v.iter().find(|s| s.contains(SEP)) {
                     panic!("Found separator \"{}\" in data string: \"{}\"", SEP, s)
@@ -109,31 +117,11 @@ impl ItemData {
                 v.join(SEP)
             });
 
-        Self {
-            components_data,
-            globals_data,
-            events_data,
-            systems_data,
-            dependencies_data,
-            paths_data,
-            crates_data,
-        }
+        Self { data }
     }
 
     pub fn write_to_file(&self) {
-        fs::write(
-            std::env::temp_dir().join(DATA_FILE),
-            format!(
-                "{}\n{}\n{}\n{}\n{}\n{}\n{}",
-                &self.components_data,
-                &self.globals_data,
-                &self.events_data,
-                &self.systems_data,
-                &self.dependencies_data,
-                &self.paths_data,
-                &self.crates_data,
-            ),
-        )
-        .expect("Could not write to data file");
+        fs::write(std::env::temp_dir().join(DATA_FILE), self.data.join("\n"))
+            .expect("Could not write to data file");
     }
 }

@@ -6,7 +6,7 @@ pub use macros::*;
 pub struct Entity;
 pub struct EntityTrash;
 
-pub type Container<T> = PhantomData<T>;
+pub type Container<T> = Vec<T>;
 pub type Label<T> = PhantomData<T>;
 pub type AndLabels<T> = PhantomData<T>;
 pub type OrLabels<T> = PhantomData<T>;

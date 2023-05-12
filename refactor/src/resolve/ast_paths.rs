@@ -1,114 +1,94 @@
 use super::ast_resolve::Path;
 
+#[macros::expand_enum]
 #[derive(Clone, Copy, Debug)]
 pub enum EnginePaths {
+    // Trait paths
     AddComponent,
     AddEvent,
-    // TODO: Only need path from crate
+    // Struct paths
     Entity,
     EntityTrash,
+    Container,
+    Label,
+    AndLabels,
+    OrLabels,
+    NandLabels,
+    NorLabels,
+    // Macro paths
+    MacroComponent,
+    MacroGlobal,
+    MacroEvent,
+    MacroSystem,
 }
 
-pub const NUM_ENGINE_PATHS: usize = 4;
-
 impl EnginePaths {
-    pub fn get_variants() -> [EnginePaths; NUM_ENGINE_PATHS] {
-        [
-            EnginePaths::AddComponent,
-            EnginePaths::AddEvent,
-            EnginePaths::Entity,
-            EnginePaths::EntityTrash,
-        ]
-    }
-
-    pub fn get_type(&self) -> String {
+    pub fn as_str(&self) -> &str {
         match self {
+            // Traits
             EnginePaths::AddComponent => "AddComponent",
             EnginePaths::AddEvent => "AddEvent",
+            // Structs
             EnginePaths::Entity => "Entity",
             EnginePaths::EntityTrash => "EntityTrash",
+            EnginePaths::Container => "Container",
+            EnginePaths::Label => "Label",
+            EnginePaths::AndLabels => "AndLabels",
+            EnginePaths::OrLabels => "OrLabels",
+            EnginePaths::NandLabels => "NandLabels",
+            EnginePaths::NorLabels => "NorLabels",
+            // Macros
+            EnginePaths::MacroComponent => "component",
+            EnginePaths::MacroGlobal => "global",
+            EnginePaths::MacroEvent => "event",
+            EnginePaths::MacroSystem => "system",
         }
-        .to_string()
     }
 
     pub fn get_path(&self) -> Vec<String> {
-        vec!["crate".to_string(), self.get_type()]
+        vec!["crate", self.as_str()]
             .iter()
             .map(|s| s.to_string())
             .collect()
     }
-}
 
-// TODO: easy way to declare hardcoded
-pub struct Paths {
-    // Macro paths
-    pub component: Path,
-    pub global: Path,
-    pub event: Path,
-    pub system: Path,
-    // Struct paths
-    pub eid: Path,
-    pub container: Path,
-    pub label: Path,
-    pub and_labels: Path,
-    pub or_labels: Path,
-    pub nand_labels: Path,
-    pub nor_labels: Path,
-    // Trait paths
-    pub engine_paths: [Path; NUM_ENGINE_PATHS],
-}
-
-impl Paths {
-    pub fn new(engine_cr_idx: usize) -> Self {
-        Self {
-            component: Path {
-                cr_idx: engine_cr_idx,
-                path: vec!["crate".to_string(), "component".to_string()],
-            },
-            global: Path {
-                cr_idx: engine_cr_idx,
-                path: vec!["crate".to_string(), "global".to_string()],
-            },
-            event: Path {
-                cr_idx: engine_cr_idx,
-                path: vec!["crate".to_string(), "event".to_string()],
-            },
-            system: Path {
-                cr_idx: engine_cr_idx,
-                path: vec!["crate".to_string(), "system".to_string()],
-            },
-            eid: Path {
-                cr_idx: engine_cr_idx,
-                path: vec!["crate".to_string(), "Entity".to_string()],
-            },
-            container: Path {
-                cr_idx: engine_cr_idx,
-                path: vec!["crate".to_string(), "Container".to_string()],
-            },
-            label: Path {
-                cr_idx: engine_cr_idx,
-                path: vec!["crate".to_string(), "Label".to_string()],
-            },
-            and_labels: Path {
-                cr_idx: engine_cr_idx,
-                path: vec!["crate".to_string(), "AndLabels".to_string()],
-            },
-            or_labels: Path {
-                cr_idx: engine_cr_idx,
-                path: vec!["crate".to_string(), "OrLabels".to_string()],
-            },
-            nand_labels: Path {
-                cr_idx: engine_cr_idx,
-                path: vec!["crate".to_string(), "NandLabels".to_string()],
-            },
-            nor_labels: Path {
-                cr_idx: engine_cr_idx,
-                path: vec!["crate".to_string(), "NorLabels".to_string()],
-            },
-            engine_paths: EnginePaths::get_variants().map(|ep| Path {
-                cr_idx: engine_cr_idx,
-                path: ep.get_path(),
-            }),
-        }
+    pub fn to_paths(engine_cr_idx: usize) -> [Path; Self::len()] {
+        Self::variants().map(|ep| Path {
+            cr_idx: engine_cr_idx,
+            path: ep.get_path(),
+        })
     }
 }
+
+// Macros for defining subsets of engine paths
+macro_rules! engine_paths {
+    ($n: ident, $($vs: ident),*) => {
+        #[macros::expand_enum]
+        #[derive(Clone, Copy, Debug)]
+        pub enum $n {
+            $($vs),*
+        }
+
+        impl $n {
+            pub fn map(&self) -> EnginePaths {
+                match self {
+                    $(Self::$vs => EnginePaths::$vs),*
+                }
+            }
+
+            pub fn get_paths(paths: &[Path; EnginePaths::len()]) -> [Path; Self::len()] {
+                Self::variants().map(|v| paths[v.map() as usize].to_owned())
+            }
+
+            pub fn to_paths(engine_cr_idx: usize) -> [Path; Self::len()] {
+                Self::get_paths(&EnginePaths::to_paths(engine_cr_idx))
+            }
+        }
+    };
+}
+
+// Paths needed by all crates
+engine_paths!(CrateEnginePaths, AddComponent, AddEvent);
+
+// Paths needed by only entry crate
+engine_paths!(EntryEnginePaths, Entity, EntityTrash);

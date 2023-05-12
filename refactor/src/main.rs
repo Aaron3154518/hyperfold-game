@@ -12,7 +12,7 @@ use util::SplitCollect;
 
 use crate::{
     decode::decoder::Decoder,
-    resolve::{ast_items::ItemsCrate, ast_paths::Paths},
+    resolve::{ast_items::ItemsCrate, ast_paths::EnginePaths},
     util::format_code,
     validate::ast_validate::ItemData,
 };
@@ -75,12 +75,10 @@ fn main() {
 
     let engine_dir =
         fs::canonicalize(PathBuf::from("engine")).expect("Could not canonicalize engine path");
-    let paths = Paths::new(
-        crates
-            .iter()
-            .find_map(|cr| (cr.dir == engine_dir).then_some(cr.idx))
-            .expect("Could not find engine crate. Please include it"),
-    );
+    let paths = crates
+        .iter()
+        .find_map(|cr| (cr.dir == engine_dir).then_some(EnginePaths::to_paths(cr.idx)))
+        .expect("Could not find engine crate. Please include it");
 
     // test_resolves(&crates);
 
