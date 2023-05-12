@@ -72,6 +72,15 @@ impl<T, const N: usize> JoinMap<T> for [T; N] {
     }
 }
 
+impl<T> JoinMap<T> for [T] {
+    fn map_vec<U, F>(&self, f: F) -> Vec<U>
+    where
+        F: FnMut(&T) -> U,
+    {
+        self.iter().map(f).collect()
+    }
+}
+
 pub trait JoinMapInto<T> {
     fn map_vec<U, F>(self, f: F) -> Vec<U>
     where
@@ -235,7 +244,7 @@ pub fn parse_syn_path(parent_path: &Vec<String>, path: &syn::Path) -> Vec<String
 pub fn format_code(s: String) -> String {
     let space_reg_l = Regex::new(r"(^|\w) (:|::|<|>|;|\.|\(|,|&|})")
         .expect("Could not parse left space codegen regex");
-    let space_reg_r = Regex::new(r"(::|<|>|;|\.|\)|&|\{|}) (\w|$)")
+    let space_reg_r = Regex::new(r"(::|<|;|\.|\)|&|\{|}) (\w|$)")
         .expect("Could not parse right space codegen regex");
     brackets(
         space_reg_l
