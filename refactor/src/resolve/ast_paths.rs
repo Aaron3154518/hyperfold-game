@@ -4,19 +4,26 @@ use super::ast_resolve::Path;
 pub enum EnginePaths {
     AddComponent,
     AddEvent,
+    // TODO: Only need path from crate
+    Entity,
 }
 
-pub const NUM_ENGINE_PATHS: usize = 2;
+pub const NUM_ENGINE_PATHS: usize = 3;
 
 impl EnginePaths {
     pub fn get_variants() -> [EnginePaths; NUM_ENGINE_PATHS] {
-        [EnginePaths::AddComponent, EnginePaths::AddEvent]
+        [
+            EnginePaths::AddComponent,
+            EnginePaths::AddEvent,
+            EnginePaths::Entity,
+        ]
     }
 
     pub fn get_type(&self) -> String {
         match self {
             EnginePaths::AddComponent => "AddComponent",
             EnginePaths::AddEvent => "AddEvent",
+            EnginePaths::Entity => "Entity",
         }
         .to_string()
     }

@@ -230,8 +230,9 @@ impl Decoder {
         let crate_paths = self.get_crate_paths();
         let crate_paths_post = deps_lrn.map_vec(|i| &crate_paths[*i]);
 
-        let engine_paths = self.get_engine_paths(cr_idx);
         let ns = format_ident!("{}", NAMESPACE);
+        let engine_paths = self.get_engine_paths(cr_idx);
+        let entity_path = &engine_paths[EnginePaths::Entity as usize];
 
         // Component manager
         let add_comp = format_ident!("{}", EnginePaths::AddComponent.get_type());
@@ -253,6 +254,8 @@ impl Decoder {
                 (vars, tys)
             },
         );
+        // TODO
+        let cfoo_def = quote!();
 
         // Event manager
         let add_event = format_ident!("{}", EnginePaths::AddEvent.get_type());
@@ -274,13 +277,16 @@ impl Decoder {
                 (vars, tys)
             },
         );
+        let enum_ident = format_ident!("E");
+        // TODO
+        let efoo_def = quote!();
 
-        // TODO: engine paths: Entity
         quote!(
             #deps_code
+            #cfoo_def
             #(
                 impl #add_comp_tr<#c_tys> for CFoo {
-                    fn add_component(&mut self, e: Entity, t: #c_tys) {
+                    fn add_component(&mut self, e: #entity_path, t: #c_tys) {
                         self.#c_vars.insert(e, t)
                     }
                 }
@@ -288,14 +294,15 @@ impl Decoder {
             #(
                 impl #crate_paths_post::#ns::#add_comp for CFoo {}
             )*
-            enum E {
+            enum #enum_ident {
                 #(#e_vars),*
             }
+            #efoo_def
             #(
                 impl #add_event_tr<#e_tys> for EFoo {
                     fn new_event(&mut self, t: #e_tys) {
                         self.#e_vars.push(t);
-                        self.add_event(E::#e_vars);
+                        self.add_event(#enum_ident::#e_vars);
                     }
 
                     fn get_event<'a>(&'a self) -> Option<&'a #e_tys> {
