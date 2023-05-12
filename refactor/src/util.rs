@@ -1,7 +1,11 @@
+extern crate alloc;
+
 use std::{
     iter::{Enumerate, Map},
     path::PathBuf,
 };
+
+use regex::Regex;
 
 // Traits for calling except() with a String (i.e. with format!())
 pub trait Catch<T> {
@@ -94,6 +98,22 @@ impl<'a, T> JoinMapInto<&'a T> for core::slice::Iter<'a, T> {
     }
 }
 
+impl<T> JoinMapInto<T> for alloc::vec::IntoIter<T> {
+    fn map_vec<U, F>(self, f: F) -> Vec<U>
+    where
+        F: FnMut(T) -> U,
+    {
+        self.map(f).collect()
+    }
+
+    fn join_map<F>(self, f: F, sep: &str) -> String
+    where
+        F: FnMut(T) -> String,
+    {
+        self.map_vec(f).join(sep)
+    }
+}
+
 impl<'a, T, Iter: Iterator<Item = &'a T>> JoinMapInto<(usize, &'a T)> for Enumerate<Iter> {
     fn map_vec<U, F>(self, f: F) -> Vec<U>
     where
@@ -129,31 +149,55 @@ impl<T> NoneOr<T> for Option<T> {
     }
 }
 
-// Trait for doing shit on tuples
+// Trait for spliting tuples
 pub trait SplitIter<T, U, V> {
-    fn split(&self, f: impl Fn(&T, &U) -> V) -> V;
+    fn split(&self, f: impl FnOnce(&T, &U) -> V) -> V;
+
+    fn split_into(self, f: impl FnOnce(T, U) -> V) -> V;
 }
 
 impl<T, U, V> SplitIter<T, U, V> for (T, U) {
-    fn split(&self, f: impl Fn(&T, &U) -> V) -> V {
+    fn split(&self, f: impl FnOnce(&T, &U) -> V) -> V {
         f(&self.0, &self.1)
+    }
+
+    fn split_into(self, f: impl FnOnce(T, U) -> V) -> V {
+        f(self.0, self.1)
     }
 }
 
 // Splitting string into list
 pub trait SplitCollect {
     fn split_collect(&self, sep: &str) -> Vec<String>;
+
+    fn split_map<F, T>(&self, sep: &str, f: F) -> Vec<T>
+    where
+        F: FnMut(&str) -> T;
 }
 
 impl SplitCollect for String {
     fn split_collect(&self, sep: &str) -> Vec<String> {
         self.split(sep).map(|s| s.to_string()).collect()
     }
+
+    fn split_map<F, T>(&self, sep: &str, f: F) -> Vec<T>
+    where
+        F: FnMut(&str) -> T,
+    {
+        self.split(sep).map(f).collect()
+    }
 }
 
 impl SplitCollect for str {
     fn split_collect(&self, sep: &str) -> Vec<String> {
         self.split(sep).map(|s| s.to_string()).collect()
+    }
+
+    fn split_map<F, T>(&self, sep: &str, f: F) -> Vec<T>
+    where
+        F: FnMut(&str) -> T,
+    {
+        self.split(sep).map(f).collect()
     }
 }
 
@@ -185,4 +229,63 @@ pub fn parse_syn_path(parent_path: &Vec<String>, path: &syn::Path) -> Vec<String
         parent_path,
         &path.segments.iter().map(|s| s.ident.to_string()).collect(),
     )
+}
+
+// Minimal code formatting for token streams
+pub fn format_code(s: String) -> String {
+    let space_reg_l = Regex::new(r"(^|\w) (:|::|<|>|;|\.|\(|,|&|})")
+        .expect("Could not parse left space codegen regex");
+    let space_reg_r = Regex::new(r"(::|<|>|;|\.|\)|&|\{|}) (\w|$)")
+        .expect("Could not parse right space codegen regex");
+    brackets(
+        space_reg_l
+            .replace_all(
+                space_reg_r
+                    .replace_all(s.replace("; ", ";\n").as_str(), "${1}${2}")
+                    .to_string()
+                    .as_str(),
+                "${1}${2}",
+            )
+            .to_string(),
+    )
+}
+
+pub fn brackets(s: String) -> String {
+    let mut l_is = s.match_indices("{");
+    let mut r_is = s.match_indices("}");
+    let mut l_i = l_is.next();
+    let mut r_i = r_is.next();
+    let idx1 = if let Some((i, _)) = l_i { i } else { return s };
+    let mut cnt: usize = 0;
+    while let Some((r, _)) = r_i {
+        if l_i.is_some_and(|(l, _)| l <= r) {
+            l_i = l_is.next();
+            cnt += 1;
+        } else {
+            r_i = r_is.next();
+            if cnt == 1 {
+                let mid = brackets(s[idx1 + 1..r].to_string())
+                    .split_collect("\n")
+                    .join("\n\t");
+                return format!(
+                    "{}{{{}}}{}{}",
+                    s[..idx1].to_string(),
+                    if mid.trim().is_empty() {
+                        String::new()
+                    } else {
+                        format!("\n\t{}\n", mid)
+                    },
+                    if r_i.is_some_and(|(r2, _)| r2 != r + 1) {
+                        "\n"
+                    } else {
+                        ""
+                    },
+                    brackets(s[r + 1..].to_string())
+                );
+            } else if cnt > 0 {
+                cnt -= 1;
+            }
+        }
+    }
+    s
 }

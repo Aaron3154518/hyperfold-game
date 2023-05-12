@@ -91,7 +91,11 @@ impl ItemData {
                         "{}",
                         Path {
                             cr_idx: cr.cr_idx,
-                            path: vec![cr.cr_name.to_string()],
+                            path: vec![if cr.cr_idx == 0 {
+                                "crate".to_string()
+                            } else {
+                                cr.cr_name.to_string()
+                            }],
                         }
                         .path_from(0, crates)
                         .join("::")

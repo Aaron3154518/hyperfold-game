@@ -6,11 +6,14 @@ use std::{
 };
 
 use parse::ast_crate::Crate;
+use regex::Regex;
 use resolve::ast_resolve;
+use util::SplitCollect;
 
 use crate::{
     decode::decoder::Decoder,
     resolve::{ast_items::ItemsCrate, ast_paths::Paths},
+    util::format_code,
     validate::ast_validate::ItemData,
 };
 
@@ -97,5 +100,8 @@ fn main() {
 
     let decoder = Decoder::new();
     // println!("{:#?}", decoder);
-    println!("{}", decoder.codegen(PathBuf::from("./test/a")).to_string());
+    println!(
+        "{}",
+        format_code(decoder.codegen(PathBuf::from("./test/a")).to_string())
+    );
 }

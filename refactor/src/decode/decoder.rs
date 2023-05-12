@@ -6,7 +6,7 @@ use regex::Regex;
 
 use crate::{
     resolve::ast_paths::{EnginePaths, NUM_ENGINE_PATHS},
-    util::{Catch, JoinMap, SplitCollect},
+    util::{Catch, JoinMap, JoinMapInto, SplitCollect, SplitIter},
     validate::constants::{component_var, DATA_FILE, NAMESPACE, SEP},
 };
 
@@ -228,9 +228,35 @@ impl Decoder {
         let crate_paths = self.get_crate_paths();
 
         // Component manager
+        let (c_vars, c_tys) = crate_paths.iter().enumerate().fold(
+            (Vec::new(), Vec::new()),
+            |(mut vars, mut tys), (cr_idx, cr_path)| {
+                self.get_components(cr_idx, "".to_string())
+                    .into_iter()
+                    .map(|c| {
+                        let c_ty = c.ty;
+                        (c.var, quote!(#cr_path #c_ty))
+                    })
+                    .unzip::<_, _, Vec<_>, Vec<_>>()
+                    .split_into(|mut vs, mut ts| {
+                        vars.append(&mut vs);
+                        tys.append(&mut ts);
+                    });
+                (vars, tys)
+            },
+        );
 
+        // TODO: Entity to engine paths
+        // TODO: engine::_engine bad?
         quote!(
             #deps_code
+            #(
+                impl Poopy<#c_tys> for CFoo {
+                    fn add_component(&mut self, e: Entity, t: #c_tys) {
+                        self.#c_vars.insert(e, t)
+                    }
+                }
+            )*
         )
     }
 
