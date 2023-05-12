@@ -4,6 +4,7 @@ use std::marker::PhantomData;
 pub use macros::*;
 
 pub struct Entity;
+pub struct EntityTrash;
 
 pub type Container<T> = PhantomData<T>;
 pub type Label<T> = PhantomData<T>;

@@ -6,9 +6,10 @@ pub enum EnginePaths {
     AddEvent,
     // TODO: Only need path from crate
     Entity,
+    EntityTrash,
 }
 
-pub const NUM_ENGINE_PATHS: usize = 3;
+pub const NUM_ENGINE_PATHS: usize = 4;
 
 impl EnginePaths {
     pub fn get_variants() -> [EnginePaths; NUM_ENGINE_PATHS] {
@@ -16,6 +17,7 @@ impl EnginePaths {
             EnginePaths::AddComponent,
             EnginePaths::AddEvent,
             EnginePaths::Entity,
+            EnginePaths::EntityTrash,
         ]
     }
 
@@ -24,6 +26,7 @@ impl EnginePaths {
             EnginePaths::AddComponent => "AddComponent",
             EnginePaths::AddEvent => "AddEvent",
             EnginePaths::Entity => "Entity",
+            EnginePaths::EntityTrash => "EntityTrash",
         }
         .to_string()
     }

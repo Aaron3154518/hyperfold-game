@@ -242,9 +242,9 @@ pub fn parse_syn_path(parent_path: &Vec<String>, path: &syn::Path) -> Vec<String
 
 // Minimal code formatting for token streams
 pub fn format_code(s: String) -> String {
-    let space_reg_l = Regex::new(r"(^|\w) (:|::|<|>|;|\.|\(|,|&|})")
+    let space_reg_l = Regex::new(r"(^|\w|\)) (:|::|<|>|;|\.|\(|,|&|})")
         .expect("Could not parse left space codegen regex");
-    let space_reg_r = Regex::new(r"(::|<|;|\.|\)|&|\{|}) (\w|$)")
+    let space_reg_r = Regex::new(r"(::|<|;|\.|\)|&|\{|}) (\w|\(|$)")
         .expect("Could not parse right space codegen regex");
     brackets(
         space_reg_l

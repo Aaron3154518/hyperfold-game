@@ -232,7 +232,8 @@ impl Decoder {
 
         let ns = format_ident!("{}", NAMESPACE);
         let engine_paths = self.get_engine_paths(cr_idx);
-        let entity_path = &engine_paths[EnginePaths::Entity as usize];
+        let entity = &engine_paths[EnginePaths::Entity as usize];
+        let entity_trash = &engine_paths[EnginePaths::EntityTrash as usize];
 
         // Component manager
         let add_comp = format_ident!("{}", EnginePaths::AddComponent.get_type());
@@ -254,8 +255,46 @@ impl Decoder {
                 (vars, tys)
             },
         );
-        // TODO
-        let cfoo_def = quote!();
+        let cfoo_ident = format_ident!("CFoo");
+        let cfoo_def = quote!(
+            pub struct #cfoo_ident {
+                eids: std::collections::HashSet<#entity>,
+                #(#c_vars: std::collections::HashMap<#entity, #c_tys>,)*
+            }
+
+            impl #cfoo_ident {
+                pub fn new() -> Self {
+                    Self {
+                        eids: std::collections::HashSet::new(),
+                        #(#c_vars: std::collections::HashMap::new(),)*
+                    }
+                }
+
+                pub fn append(&mut self, cm: &mut #cfoo_ident) {
+                    self.eids.extend(cm.eids.drain());
+                    #(self.#c_vars.extend(cm.#c_vars.drain());)*
+                }
+
+                pub fn remove(&mut self, tr: &mut #entity_trash) {
+                    for eid in tr.0.drain(..) {
+                        self.eids.remove(&eid);
+                        #(self.#c_vars.remove(&eid);)*
+                    }
+                }
+            }
+        );
+        let cfoo_traits = quote!(
+            #(
+                impl #add_comp_tr<#c_tys> for #cfoo_ident {
+                    fn add_component(&mut self, e: #entity, t: #c_tys) {
+                        self.#c_vars.insert(e, t)
+                    }
+                }
+            )*
+            #(
+                impl #crate_paths_post::#ns::#add_comp for #cfoo_ident {}
+            )*
+        );
 
         // Event manager
         let add_event = format_ident!("{}", EnginePaths::AddEvent.get_type());
@@ -277,32 +316,68 @@ impl Decoder {
                 (vars, tys)
             },
         );
-        let enum_ident = format_ident!("E");
-        // TODO
-        let efoo_def = quote!();
-
-        quote!(
-            #deps_code
-            #cfoo_def
-            #(
-                impl #add_comp_tr<#c_tys> for CFoo {
-                    fn add_component(&mut self, e: #entity_path, t: #c_tys) {
-                        self.#c_vars.insert(e, t)
-                    }
-                }
-            )*
-            #(
-                impl #crate_paths_post::#ns::#add_comp for CFoo {}
-            )*
-            enum #enum_ident {
+        let e_ident = format_ident!("E");
+        let e_len_ident = format_ident!("E_LEN");
+        let e_len = e_vars.len();
+        let e_def = quote!(
+            #[derive(Hash, Clone, Copy, Eq, PartialEq, Debug)]
+            enum #e_ident {
                 #(#e_vars),*
             }
-            #efoo_def
+            pub const #e_len_ident: usize = #e_len;
+        );
+        let efoo_ident = format_ident!("EFoo");
+        let efoo_def = quote!(
+            #[derive(Debug)]
+            pub struct #efoo_ident {
+                #(#e_vars: Vec<#e_tys>),*,
+                events: std::collections::VecDeque<(E, usize)>
+            }
+
+            impl #efoo_ident {
+                pub fn new() -> Self {
+                    Self {
+                        #(#e_vars: Vec::new()),*,
+                        events: std::collections::VecDeque::new()
+                    }
+                }
+
+                pub fn has_events(&self) -> bool {
+                    !self.events.is_empty()
+                }
+
+                fn add_event(&mut self, e: #e_ident) {
+                    self.events.push_back((e, 0));
+                }
+
+                pub fn get_events(&mut self) -> std::collections::VecDeque<(#e_ident, usize)> {
+                    std::mem::replace(&mut self.events, std::collections::VecDeque::new())
+                }
+
+                pub fn append(&mut self, other: &mut Self) {
+                    #(
+                        other.#e_vars.reverse();
+                        self.#e_vars.append(&mut other.#e_vars);
+                    )*
+                }
+
+                pub fn pop(&mut self, e: #e_ident) {
+                    match e {
+                        #(
+                            #e_ident::#e_vars => {
+                                self.#e_vars.pop();
+                            }
+                        )*
+                    }
+                }
+            }
+        );
+        let efoo_traits = quote!(
             #(
-                impl #add_event_tr<#e_tys> for EFoo {
+                impl #add_event_tr<#e_tys> for #efoo_ident {
                     fn new_event(&mut self, t: #e_tys) {
                         self.#e_vars.push(t);
-                        self.add_event(#enum_ident::#e_vars);
+                        self.add_event(#e_ident::#e_vars);
                     }
 
                     fn get_event<'a>(&'a self) -> Option<&'a #e_tys> {
@@ -311,8 +386,19 @@ impl Decoder {
                 }
             )*
             #(
-                impl #crate_paths_post::#ns::#add_event for EFoo {}
+                impl #crate_paths_post::#ns::#add_event for #efoo_ident {}
             )*
+        );
+
+        quote!(
+            #deps_code
+
+            #cfoo_def
+            #cfoo_traits
+
+            #e_def
+            #efoo_def
+            #efoo_traits
         )
     }
 
