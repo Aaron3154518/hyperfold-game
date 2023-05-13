@@ -198,7 +198,7 @@ impl FnArg {
                                 },
                                 |(cr_i, c_i, _)| component_var(cr_i, c_i)
                             ),
-                            ","
+                            "-"
                         )
                     )
                 })
@@ -235,7 +235,7 @@ impl FnArg {
                                     },
                                     |s| s
                                 ),
-                            ":"
+                            "-"
                         )
                     )
                 })
@@ -261,7 +261,7 @@ impl System {
             "{}({})",
             self.path.path[1..].join("::"),
             self.args
-                .join_map(|a| a.validate_to_data(paths, items, &mut errs), ",")
+                .join_map(|a| a.validate_to_data(paths, items, &mut errs), ":")
         );
         if !errs.is_empty() {
             panic!(

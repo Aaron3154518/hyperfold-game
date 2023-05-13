@@ -20,6 +20,7 @@ use super::{
     dependency::Dependency,
     event::{self, Event},
     idents::Idents,
+    system::{ContainerArg, FnArg, LabelType, System},
 };
 
 #[derive(Debug)]
@@ -89,6 +90,98 @@ impl Decoder {
                             },
                         })
                         .catch(format!("Could not parse event: {}", data))
+                })
+                .collect(),
+        }
+    }
+
+    fn get_systems(&self, cr_idx: usize, cr_alias: String) -> Vec<System> {
+        let id = r"id";
+        let c = r"c\d+_\d+";
+        let g = r"g\d+_\d+";
+        let e = r"e\d+_\d+_\d+";
+        let l = format!(r"l(!)?[\|&]{c}(-{c})*");
+        let v_c = format!(r"(m)?{c}");
+        let v_i = format!(r"{v_c}|{id}");
+        let v = format!(r"v({v_i})(-({v_i}))*");
+
+        let [id_reg, c_reg, g_reg, e_reg, l_reg, v_c_reg, v_reg] = [id, c, g, e, &l, &v_c, &v].map(
+            |r_str| Regex::new(format!(r"^{r_str}$").as_str()).catch(format!("Could not create regex: \"^{r_str}$\""))
+        );
+
+        let arg = format!(r"{id}|{c}|{g}|{e}|{l}|{v}");
+        let sys_reg = Regex::new(format!(r"(?P<name>\w+)\((?P<args>(({arg})(:({arg}))*)?)\)").as_str())
+            .expect("Could not create system regex");
+
+        match self.get_crate_data(Data::Systems, cr_idx).as_str() {
+            "" => Vec::new(),
+            data => data
+                .split(",")
+                .map(|s| {
+                    sys_reg
+                        .captures(s)
+                        .and_then(|c| c.name("name").zip(c.name("args")))
+                        .map(|(name, args)| {
+                            let path = format!("{cr_alias}::{}", name.as_str());
+                            System {
+                                path: syn::parse_str(path.as_str())
+                                    .catch(format!("Could not parse system name: {path}")),
+                                args: match args.as_str() {
+                                    "" => Vec::new(),
+                                    s => s.split_map(":", |a| {
+                                        // Entity id
+                                        id_reg.find(a)
+                                            .map(|_| FnArg::EntityId)
+                                            // Component
+                                            .or_else(|| {
+                                                c_reg.find(a)
+                                                    .map(|_| FnArg::Component(format_ident!("{a}")))
+                                            })
+                                            // Global
+                                            .or_else(|| {
+                                                g_reg.find(a).map(|_| FnArg::Global(format_ident!("{a}")))
+                                            })
+                                            // Event
+                                            .or_else(|| {
+                                                e_reg.find(a).map(|_| FnArg::Event(format_ident!("{a}")))
+                                            })
+                                            // Label
+                                            .or_else(|| {
+                                                l_reg.find(a).map(|_| FnArg::Label(LabelType::from(a), 
+                                                    a.trim_start_matches([
+                                                        'l','!','&','|'
+                                                    ]).split_map("-", |a| {
+                                                        c_reg.find(a).map(|_| format_ident!("{a}")).catch(format!("Could not parse label type: {a}"))
+                                                    })
+                                                ))
+                                            })
+                                            // Container
+                                            .or_else(|| {
+                                                v_reg.find(a).map(|_| {
+                                                    FnArg::Container(a.split_at(1).split_into(
+                                                        |_, args| {
+                                                            args.split_map("-", |a| {
+                                                                id_reg.find(a)
+                                                                    .map(|_| ContainerArg::EntityId)
+                                                                    .or_else(|| {
+                                                                        v_c_reg.find(a).map(|_| {
+                                                                            ContainerArg::Component(
+                                                                                a.starts_with("m"),
+                                                                                format_ident!("{}", a.trim_start_matches("m")),
+                                                                            )
+                                                                        })
+                                                                    }).catch(format!("Could not parse container item: {a}"))
+                                                            })
+                                                        },
+                                                    ))
+                                                })
+                                            })
+                                            .catch(format!("Could not parse system argument: {a}"))
+                                    }),
+                                }
+                            }
+                        })
+                        .catch(format!("Could not parse system: {s}"))
                 })
                 .collect(),
         }
@@ -434,6 +527,18 @@ impl Decoder {
         let g_camera = &engine_globals[EngineGlobals::Camera as usize];
         let g_efoo = &engine_globals[EngineGlobals::EFoo as usize];
         let g_cfoo = &engine_globals[EngineGlobals::CFoo as usize];
+
+        // Systems
+        let systems = crate_paths.iter().enumerate().fold(
+            Vec::new(),
+            |mut v, (cr_idx, cr_path)| {
+                v.append(&mut self.get_systems(cr_idx, String::new()));
+                v
+            },
+        );
+        for s in systems.iter() {
+            println!("{}({:#?})", s.path.to_token_stream().to_string(), s.args)
+        }
 
         // Systems manager
         let sfoo_ident = Idents::SFoo.to_ident();

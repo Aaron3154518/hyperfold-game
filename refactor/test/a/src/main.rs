@@ -11,7 +11,10 @@ union T5 {
 #[engine::component]
 pub struct T6;
 pub fn T7() {}
-enum T8 {}
+// TODO: try toggling pub
+// TODO: events
+#[engine::event]
+pub enum T8 {}
 
 mod a1;
 pub mod a2;
@@ -25,10 +28,11 @@ pub trait EFoo {}
 
 #[engine::system]
 fn foo(
+    // _e: &crate::T8,
     t6: &T6,
     dc: &c::e::DC,
     sc: Label<T6>,
-    re: NorLabels<(&T6,)>,
+    re: NorLabels<(&T6, &T6)>,
     vc: Container<(&mut T6, &engine::Entity)>,
     t: &dyn EFoo,
     a: &mut a2::a3::A::A,
