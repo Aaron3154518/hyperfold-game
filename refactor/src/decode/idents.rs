@@ -6,6 +6,10 @@ use crate::{resolve::ast_paths::EnginePaths, validate::constants::NAMESPACE};
 pub enum Idents {
     // General
     Namespace,
+    // Systems
+    SFoo,
+    // Globals
+    GFoo,
     // Components
     AddComponent,
     CFoo,
@@ -20,6 +24,8 @@ impl Idents {
     pub fn as_str(&self) -> &str {
         match self {
             Self::Namespace => NAMESPACE,
+            Self::SFoo => "SFoo",
+            Self::GFoo => "GFoo",
             Self::AddComponent => EnginePaths::AddComponent.as_str(),
             Self::CFoo => "CFoo",
             Self::AddEvent => EnginePaths::AddEvent.as_str(),

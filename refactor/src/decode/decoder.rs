@@ -11,7 +11,7 @@ use crate::{
     util::{Catch, JoinMap, JoinMapInto, SplitCollect, SplitIter},
     validate::{
         ast_validate::Data,
-        constants::{component_var, DATA_FILE, NAMESPACE, SEP},
+        constants::{component_var, event_var, global_var, DATA_FILE, NAMESPACE, SEP},
     },
 };
 
@@ -50,8 +50,13 @@ impl Decoder {
             .catch(format!("Invalid crate index: {}", cr_idx))
     }
 
-    fn get_components(&self, cr_idx: usize, cr_alias: String) -> Vec<Component> {
-        match self.get_crate_data(Data::Components, cr_idx).as_str() {
+    fn get_components(&self, cr_idx: usize, cr_alias: String, data_ty: Data) -> Vec<Component> {
+        let var_fn = match data_ty {
+            Data::Components => component_var,
+            Data::Globals => global_var,
+            _ => panic!("Expected components or globals data, found: {:#?}", data_ty),
+        };
+        match self.get_crate_data(data_ty, cr_idx).as_str() {
             "" => Vec::new(),
             data => data
                 .split(",")
@@ -59,7 +64,7 @@ impl Decoder {
                 .map(|(i, c)| Component {
                     ty: syn::parse_str(format!("{}::{}", cr_alias, c).as_str())
                         .catch(format!("Could not parse type: {}", c)),
-                    var: format_ident!("{}", component_var(cr_idx, i)),
+                    var: format_ident!("{}", var_fn(cr_idx, i)),
                 })
                 .collect(),
         }
@@ -136,6 +141,7 @@ impl Decoder {
             .catch(format!("Could not parse engine type: {}", i))
         })
     }
+
     fn get_entry_engine_paths(&self) -> [syn::Type; EntryEnginePaths::len()] {
         let mut data = self.data[Data::EntryEnginePaths as usize][0].split(",");
         array::from_fn(|i| {
@@ -164,7 +170,7 @@ impl Decoder {
         let add_comp = Idents::AddComponent.to_ident();
         let add_comp_tr = &engine_paths[CrateEnginePaths::AddComponent as usize];
         let mut comp_trs = self
-            .get_components(cr_idx, "crate".to_string())
+            .get_components(cr_idx, "crate".to_string(), Data::Components)
             .into_iter()
             .map(|c| {
                 let c_ty = c.ty;
@@ -223,26 +229,46 @@ impl Decoder {
         let entity = &entry_engine_paths[EntryEnginePaths::Entity as usize];
         let entity_trash = &entry_engine_paths[EntryEnginePaths::EntityTrash as usize];
 
+        // Get all globals and components
+        let [(c_vars, c_tys), (g_vars, g_tys)] = [Data::Components, Data::Globals].map(|data_ty| {
+            crate_paths.iter().enumerate().fold(
+                (Vec::new(), Vec::new()),
+                |(mut vars, mut tys), (cr_idx, cr_path)| {
+                    self.get_components(cr_idx, String::new(), data_ty)
+                        .into_iter()
+                        .map(|c| {
+                            let c_ty = c.ty;
+                            (c.var, quote!(#cr_path #c_ty))
+                        })
+                        .unzip()
+                        .split_into(|mut vs, mut ts| {
+                            vars.append(&mut vs);
+                            tys.append(&mut ts);
+                        });
+                    (vars, tys)
+                },
+            )
+        });
+
+        // Global manager
+        let gfoo_ident = Idents::GFoo.to_ident();
+        let gfoo_def = quote!(
+            pub struct #gfoo_ident {
+                #(#g_vars: #g_tys),*
+            }
+
+            impl #gfoo_ident {
+                pub fn new() -> Self {
+                    Self {
+                        #(#g_vars: #g_tys::new(),)*
+                    }
+                }
+            }
+        );
+
         // Component manager
         let add_comp = Idents::AddComponent.to_ident();
         let add_comp_tr = &crate_engine_paths[CrateEnginePaths::AddComponent as usize];
-        let (c_vars, c_tys) = crate_paths.iter().enumerate().fold(
-            (Vec::new(), Vec::new()),
-            |(mut vars, mut tys), (cr_idx, cr_path)| {
-                self.get_components(cr_idx, String::new())
-                    .into_iter()
-                    .map(|c| {
-                        let c_ty = c.ty;
-                        (c.var, quote!(#cr_path #c_ty))
-                    })
-                    .unzip()
-                    .split_into(|mut vs, mut ts| {
-                        vars.append(&mut vs);
-                        tys.append(&mut ts);
-                    });
-                (vars, tys)
-            },
-        );
         let cfoo_ident = Idents::CFoo.to_ident();
         let cfoo_def = quote!(
             pub struct #cfoo_ident {
@@ -297,7 +323,7 @@ impl Decoder {
                 {
                     let e_ty = e.ty;
                     for (v_i, v) in e.variants.iter().enumerate() {
-                        vars.push(format_ident!("e{}_{}_{}", cr_idx, e_i, v_i));
+                        vars.push(event_var(cr_idx, e_i, v_i));
                         tys.push(quote!(#cr_path #e_ty::#v));
                     }
                 }
@@ -380,6 +406,8 @@ impl Decoder {
 
         quote!(
             #deps_code
+
+            #gfoo_def
 
             #cfoo_def
             #cfoo_traits
