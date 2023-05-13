@@ -9,7 +9,7 @@ use crate::{
     resolve::{
         ast_args::{ComponentMacroArgs, GlobalMacroArgs},
         ast_items::{Component, Dependency, Event, Global, ItemsCrate, System},
-        ast_paths::{CrateEnginePaths, EnginePaths, EntryEnginePaths},
+        ast_paths::{EngineGlobals, EngineTraits, ExpandEnum, Paths},
         ast_resolve::Path,
     },
     util::{end, Catch, JoinMap, JoinMapInto, NoneOr, SplitIter},
@@ -23,46 +23,45 @@ use super::{
 // Pass 3: Item validation
 // Map system arg paths to items
 #[macros::expand_enum]
-#[derive(Copy, Clone, Debug)]
 pub enum Data {
     Components,
     Globals,
     Events,
     Systems,
     Dependencies,
-    CrateEnginePaths,
-    EntryEnginePaths,
+    EngineTraits,
+    EngineGlobals,
     CratePaths,
 }
 
 #[derive(Debug)]
 pub struct ItemData {
-    pub data: [String; Data::len()],
+    pub data: [String; Data::LEN],
 }
 
 impl ItemData {
-    pub fn validate(paths: &[Path; EnginePaths::len()], crates: &mut Vec<ItemsCrate>) -> Self {
+    pub fn validate(paths: &Paths, crates: &mut Vec<ItemsCrate>) -> Self {
         // Sort in order of crate index
         crates.sort_by_key(|cr| cr.cr_idx);
 
-        let traits = [vec!["crate", "CFoo"], vec!["crate", "EFoo"]]
-            .map(|path| Global {
-                path: Path {
-                    cr_idx: 0,
-                    path: path.iter().map(|s| s.to_string()).collect(),
-                },
-                args: GlobalMacroArgs {
-                    is_dummy: false,
-                    is_const: false,
-                    is_trait: true,
-                },
-            })
-            .to_vec();
+        let traits = [
+            paths.get_global(EngineGlobals::CFoo),
+            paths.get_global(EngineGlobals::EFoo),
+        ]
+        .map(|path| Global {
+            path: path.to_owned(),
+            args: GlobalMacroArgs {
+                is_dummy: false,
+                is_const: false,
+                is_trait: true,
+            },
+        })
+        .to_vec();
 
         // Collect items
         let items = ItemList::from(crates, &traits);
 
-        let data = Data::variants()
+        let data = Data::VARIANTS
             .map(|dv| match dv {
                 Data::Components => items
                     .components
@@ -88,12 +87,28 @@ impl ItemData {
                             .join_map(|d| format!("{}:{}", d.cr_alias, d.cr_idx), ",")
                     )
                 }),
-                Data::CrateEnginePaths => crates.map_vec(|cr| {
-                    CrateEnginePaths::get_paths(&paths)
-                        .join_map(|ep| ep.path_from(cr.cr_idx, crates).join("::"), ",")
+                Data::EngineTraits => crates.map_vec(|cr| {
+                    paths
+                        .traits
+                        .join_map(|p| p.path_from(cr.cr_idx, crates).join("::"), ",")
                 }),
-                Data::EntryEnginePaths => vec![EntryEnginePaths::get_paths(&paths)
-                    .join_map(|ep| ep.path_from(0, crates).join("::"), ",")],
+                Data::EngineGlobals => vec![paths.globals.join_map(
+                    |p| {
+                        format!(
+                            "{}_{}",
+                            p.cr_idx,
+                            items.globals[p.cr_idx]
+                                .iter()
+                                .position(|g| &g.path == p)
+                                .catch(format!(
+                                    "Could not find global: {} in crate {}",
+                                    p.path.join("::"),
+                                    p.cr_idx
+                                ))
+                        )
+                    },
+                    ",",
+                )],
                 Data::CratePaths => crates.map_vec(|cr| {
                     format!(
                         "{}",

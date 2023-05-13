@@ -6,8 +6,31 @@ use std::{
     path::PathBuf,
 };
 
-use super::{ast_file::DirType, ast_mod::Mod};
-use crate::util::Catch;
+use super::{
+    ast_file::DirType,
+    ast_mod::{Mod, ModType},
+};
+use crate::{
+    resolve::ast_paths::Paths,
+    util::{Catch, SplitIter},
+};
+
+const ENGINE: &str = "engine";
+const MACROS: &str = "macros";
+
+pub fn get_engine_dir() -> PathBuf {
+    fs::canonicalize(PathBuf::from(ENGINE)).expect("Could not canonicalize engine macros path")
+}
+
+pub fn get_macros_dir() -> PathBuf {
+    get_engine_dir().join("macros")
+}
+
+#[derive(Clone, Copy, Debug)]
+enum Dependency {
+    Crate(usize),
+    MacrosCrate,
+}
 
 #[derive(Debug)]
 pub struct Crate {
@@ -47,16 +70,15 @@ impl Crate {
         }
     }
 
-    pub fn parse(mut dir: PathBuf) -> Vec<Self> {
-        let mut crates = vec![Crate::new(dir.to_owned(), 0, true)];
-
-        let mut i = 0;
-        while i < crates.len() {
-            let cr_dir = crates[i].dir.to_owned();
-            let deps = Crate::parse_cargo_toml(cr_dir.to_owned());
-            let mut new_deps = Vec::new();
-            crates[i].deps = deps
-                .into_iter()
+    fn get_crate_dependencies(
+        cr_dir: PathBuf,
+        block_dirs: &HashMap<PathBuf, Dependency>,
+        crates: &Vec<Crate>,
+    ) -> (Vec<(Dependency, String)>, Vec<String>) {
+        let deps = Crate::parse_cargo_toml(cr_dir.to_owned());
+        let mut new_deps = Vec::new();
+        (
+            deps.into_iter()
                 .map(|(name, path)| {
                     let dep_dir = fs::canonicalize(cr_dir.join(path.to_string())).catch(format!(
                         "Could not canonicalize dependency path: {}: {}/{}",
@@ -64,22 +86,73 @@ impl Crate {
                         cr_dir.display(),
                         path
                     ));
-                    match crates.iter().position(|cr| cr.dir == dep_dir) {
-                        Some(i) => (i, name),
-                        None => {
-                            new_deps.push(path);
-                            (crates.len() + new_deps.len() - 1, name)
-                        }
+                    match block_dirs.get(&dep_dir) {
+                        Some(d) => (*d, name),
+                        None => match crates.iter().position(|cr| cr.dir == dep_dir) {
+                            Some(i) => (Dependency::Crate(i), name),
+                            None => {
+                                new_deps.push(path);
+                                (Dependency::Crate(crates.len() + new_deps.len() - 1), name)
+                            }
+                        },
                     }
                 })
-                .collect::<HashMap<_, _>>();
-            for path in new_deps {
-                crates.push(Crate::new(cr_dir.join(path), crates.len(), false))
-            }
+                .collect(),
+            new_deps,
+        )
+    }
+
+    pub fn parse(mut dir: PathBuf) -> (Vec<Self>, Paths) {
+        let mut crates = vec![Crate::new(dir.to_owned(), 0, true)];
+
+        let engine_dir = get_engine_dir();
+        let macros_dir = get_macros_dir();
+        let block_dirs = [(macros_dir.to_owned(), Dependency::MacrosCrate)]
+            .into_iter()
+            .collect::<HashMap<_, _>>();
+
+        let mut crate_deps = Vec::new();
+        let mut i = 0;
+        while i < crates.len() {
+            let cr_dir = crates[i].dir.to_owned();
+            Self::get_crate_dependencies(cr_dir.to_owned(), &block_dirs, &crates).split_into(
+                |deps, new_deps| {
+                    crate_deps.push(deps);
+                    for path in new_deps {
+                        crates.push(Crate::new(cr_dir.join(path), crates.len(), false))
+                    }
+                },
+            );
             i += 1;
         }
 
-        crates
+        let engine_cr_idx = crates
+            .iter()
+            .find_map(|cr| (cr.dir == engine_dir).then_some(cr.idx))
+            .expect("Could not find engine crate");
+
+        // Add macros crate at the end
+        let macros_cr_idx = crates.len();
+        crates.push(Crate::new(macros_dir.to_owned(), macros_cr_idx, false));
+        crate_deps.push(Vec::new());
+
+        // Insert correct dependencies
+        for (cr, deps) in crates.iter_mut().zip(crate_deps.into_iter()) {
+            cr.deps = deps
+                .into_iter()
+                .map(|(d, name)| {
+                    (
+                        match d {
+                            Dependency::Crate(i) => i,
+                            Dependency::MacrosCrate => macros_cr_idx,
+                        },
+                        name,
+                    )
+                })
+                .collect()
+        }
+
+        (crates, Paths::new(engine_cr_idx, macros_cr_idx))
     }
 
     fn parse_cargo_toml(dir: PathBuf) -> HashMap<String, String> {

@@ -3,8 +3,19 @@ use std::marker::PhantomData;
 // The path resolver can't find the macro paths in "macros" so they will be labelled under "engine"
 pub use macros::*;
 
+// Important globals
+#[global]
 pub struct Entity;
+#[global]
 pub struct EntityTrash;
+#[global]
+pub struct Event;
+#[global]
+pub struct RenderSystem;
+#[macros::global]
+pub struct Screen;
+#[macros::global]
+pub struct Camera;
 
 pub type Container<T> = Vec<T>;
 pub type Label<T> = PhantomData<T>;

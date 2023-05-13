@@ -59,7 +59,9 @@ impl Path {
                 frontier.push((new_path, new_score));
             } else {
                 panic!(
-                    "Could not find path from entry crate to crate {}",
+                    "Could not find path from crate {} to path {} in crate {}",
+                    cr_idx,
+                    self.path.join("::"),
                     self.cr_idx
                 );
             }

@@ -1,6 +1,9 @@
 use quote::format_ident;
 
-use crate::{resolve::ast_paths::EnginePaths, validate::constants::NAMESPACE};
+use crate::{
+    resolve::ast_paths::{EngineTraits, ExpandEnum, GetPaths},
+    validate::constants::NAMESPACE,
+};
 
 #[macros::expand_enum]
 pub enum Idents {
@@ -26,9 +29,9 @@ impl Idents {
             Self::Namespace => NAMESPACE,
             Self::SFoo => "SFoo",
             Self::GFoo => "GFoo",
-            Self::AddComponent => EnginePaths::AddComponent.as_str(),
+            Self::AddComponent => EngineTraits::AddComponent.as_str(),
             Self::CFoo => "CFoo",
-            Self::AddEvent => EnginePaths::AddEvent.as_str(),
+            Self::AddEvent => EngineTraits::AddEvent.as_str(),
             Self::EFoo => "EFoo",
             Self::E => "E",
             Self::ELen => "E_LEN",

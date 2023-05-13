@@ -11,18 +11,11 @@ pub fn expand_enum(_input: TokenStream, item: TokenStream) -> TokenStream {
     let e_varis = e.variants.iter().map(|v| &v.ident).collect::<Vec<_>>();
 
     quote!(
+        #[derive(Clone, Copy, Debug)]
         #e
 
-        impl #e_name {
-            pub const fn len() -> usize {
-                #e_len
-            }
-
-            pub const fn variants() -> [Self; Self::len()] {
-                [
-                    #(Self::#e_varis),*
-                ]
-            }
+        impl ExpandEnum<#e_len> for  #e_name {
+            const VARIANTS: [Self; #e_len] = [#(Self::#e_varis),*];
         }
     )
     .into()

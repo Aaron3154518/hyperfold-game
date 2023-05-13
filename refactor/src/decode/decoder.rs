@@ -7,7 +7,7 @@ use syn::{PathArguments, PathSegment};
 
 use crate::{
     decode::dependency::get_deps_post_order,
-    resolve::ast_paths::{CrateEnginePaths, EntryEnginePaths},
+    resolve::ast_paths::{EngineGlobals, EngineTraits, ExpandEnum, GetPaths},
     util::{Catch, JoinMap, JoinMapInto, SplitCollect, SplitIter},
     validate::{
         ast_validate::Data,
@@ -24,7 +24,7 @@ use super::{
 
 #[derive(Debug)]
 pub struct Decoder {
-    data: [Vec<String>; Data::len()],
+    data: [Vec<String>; Data::LEN],
 }
 
 impl Decoder {
@@ -131,8 +131,8 @@ impl Decoder {
         })
     }
 
-    fn get_crate_engine_paths(&self, cr_idx: usize) -> [syn::Type; CrateEnginePaths::len()] {
-        let mut data = self.data[Data::CrateEnginePaths as usize][cr_idx].split(",");
+    fn get_engine_trait_paths(&self, cr_idx: usize) -> [syn::Type; EngineTraits::LEN] {
+        let mut data = self.data[Data::EngineTraits as usize][cr_idx].split(",");
         array::from_fn(|i| {
             syn::parse_str(
                 data.next()
@@ -142,14 +142,23 @@ impl Decoder {
         })
     }
 
-    fn get_entry_engine_paths(&self) -> [syn::Type; EntryEnginePaths::len()] {
-        let mut data = self.data[Data::EntryEnginePaths as usize][0].split(",");
+    fn get_engine_globals(&self) -> [(usize, usize); EngineGlobals::LEN] {
+        let mut data = self.data[Data::EngineGlobals as usize][0].split(",");
         array::from_fn(|i| {
-            syn::parse_str(
-                data.next()
-                    .catch(format!("Could not get entry engine path: {}", i)),
-            )
-            .catch(format!("Could not parse engine type: {}", i))
+            let str = data
+                .next()
+                .catch(format!("Could not parse engine global data: {}", i));
+            str.split_once("_")
+                .catch(format!("Could not parse engine global: {}", str))
+                .split_into(|cr_idx, g_i| {
+                    (
+                        cr_idx
+                            .parse::<usize>()
+                            .catch(format!("Invalid engine global crate index: {}", cr_idx)),
+                        g_i.parse::<usize>()
+                            .catch(format!("Invalid engine global index: {}", g_i)),
+                    )
+                })
         })
     }
 
@@ -159,7 +168,7 @@ impl Decoder {
     }
 
     fn codegen_dep(&self, cr_idx: usize, deps: &Vec<Vec<Dependency>>) -> TokenStream {
-        let engine_paths = self.get_crate_engine_paths(cr_idx);
+        let engine_paths = self.get_engine_trait_paths(cr_idx);
         let ns = format_ident!("{}", NAMESPACE);
         let dep_aliases = deps[cr_idx]
             .iter()
@@ -168,7 +177,7 @@ impl Decoder {
 
         // Aggregate AddComponent traits and dependencies
         let add_comp = Idents::AddComponent.to_ident();
-        let add_comp_tr = &engine_paths[CrateEnginePaths::AddComponent as usize];
+        let add_comp_tr = &engine_paths[EngineTraits::AddComponent as usize];
         let mut comp_trs = self
             .get_components(cr_idx, "crate".to_string(), Data::Components)
             .into_iter()
@@ -189,7 +198,7 @@ impl Decoder {
 
         // Aggregate AddEvent traits and dependencies
         let add_event = Idents::AddEvent.to_ident();
-        let add_event_tr = &engine_paths[CrateEnginePaths::AddEvent as usize];
+        let add_event_tr = &engine_paths[EngineTraits::AddEvent as usize];
         let mut event_trs = self
             .get_events(cr_idx, "crate".to_string())
             .into_iter()
@@ -220,14 +229,9 @@ impl Decoder {
         let deps_code = self.codegen_dep(cr_idx, deps);
 
         let deps_lrn = get_deps_post_order(deps);
+        // Paths from entry crate to all other crates
         let crate_paths = self.get_crate_paths();
         let crate_paths_post = deps_lrn.map_vec(|i| &crate_paths[*i]);
-
-        let ns = Idents::Namespace.to_ident();
-        let crate_engine_paths = self.get_crate_engine_paths(cr_idx);
-        let entry_engine_paths = self.get_entry_engine_paths();
-        let entity = &entry_engine_paths[EntryEnginePaths::Entity as usize];
-        let entity_trash = &entry_engine_paths[EntryEnginePaths::EntityTrash as usize];
 
         // Get all globals and components
         let [(c_vars, c_tys), (g_vars, g_tys)] = [Data::Components, Data::Globals].map(|data_ty| {
@@ -266,14 +270,30 @@ impl Decoder {
             }
         );
 
+        // Namespace identifier
+        let ns = Idents::Namespace.to_ident();
+        // Paths engine traits
+        let engine_trait_paths = self.get_engine_trait_paths(cr_idx);
+
+        let engine_globals = self.get_engine_globals();
+        // Paths to engine globals
+        let [gp_entity, gp_entity_trash] =
+            [EngineGlobals::Entity, EngineGlobals::EntityTrash].map(|eg| {
+                engine_globals[eg as usize].split(|cr_idx, _| {
+                    let path = &crate_paths[*cr_idx];
+                    let ident = format_ident!("{}", EngineGlobals::Entity.as_str());
+                    quote!(#path::#ident)
+                })
+            });
+
         // Component manager
         let add_comp = Idents::AddComponent.to_ident();
-        let add_comp_tr = &crate_engine_paths[CrateEnginePaths::AddComponent as usize];
+        let add_comp_tr = &engine_trait_paths[EngineTraits::AddComponent as usize];
         let cfoo_ident = Idents::CFoo.to_ident();
         let cfoo_def = quote!(
             pub struct #cfoo_ident {
-                eids: std::collections::HashSet<#entity>,
-                #(#c_vars: std::collections::HashMap<#entity, #c_tys>,)*
+                eids: std::collections::HashSet<#gp_entity>,
+                #(#c_vars: std::collections::HashMap<#gp_entity, #c_tys>,)*
             }
 
             impl #cfoo_ident {
@@ -289,7 +309,7 @@ impl Decoder {
                     #(self.#c_vars.extend(cm.#c_vars.drain());)*
                 }
 
-                pub fn remove(&mut self, tr: &mut #entity_trash) {
+                pub fn remove(&mut self, tr: &mut #gp_entity_trash) {
                     for eid in tr.0.drain(..) {
                         self.eids.remove(&eid);
                         #(self.#c_vars.remove(&eid);)*
@@ -300,7 +320,7 @@ impl Decoder {
         let cfoo_traits = quote!(
             #(
                 impl #add_comp_tr<#c_tys> for #cfoo_ident {
-                    fn add_component(&mut self, e: #entity, t: #c_tys) {
+                    fn add_component(&mut self, e: #gp_entity, t: #c_tys) {
                         self.#c_vars.insert(e, t)
                     }
                 }
@@ -312,7 +332,7 @@ impl Decoder {
 
         // Event manager
         let add_event = Idents::AddEvent.to_ident();
-        let add_event_tr = &crate_engine_paths[CrateEnginePaths::AddEvent as usize];
+        let add_event_tr = &engine_trait_paths[EngineTraits::AddEvent as usize];
         let (e_vars, e_tys) = crate_paths.iter().enumerate().fold(
             (Vec::new(), Vec::new()),
             |(mut vars, mut tys), (cr_idx, cr_path)| {
@@ -323,7 +343,7 @@ impl Decoder {
                 {
                     let e_ty = e.ty;
                     for (v_i, v) in e.variants.iter().enumerate() {
-                        vars.push(event_var(cr_idx, e_i, v_i));
+                        vars.push(format_ident!("{}", event_var(cr_idx, e_i, v_i)));
                         tys.push(quote!(#cr_path #e_ty::#v));
                     }
                 }
@@ -345,7 +365,7 @@ impl Decoder {
             #[derive(Debug)]
             pub struct #efoo_ident {
                 #(#e_vars: Vec<#e_tys>),*,
-                events: std::collections::VecDeque<(E, usize)>
+                events: std::collections::VecDeque<(#e_ident, usize)>
             }
 
             impl #efoo_ident {
@@ -404,6 +424,173 @@ impl Decoder {
             )*
         );
 
+        // Variables for engine globals
+        let engine_globals =
+            engine_globals.map(|(cr_idx, g_i)| format_ident!("{}", global_var(cr_idx, g_i)));
+        let g_event = &engine_globals[EngineGlobals::Event as usize];
+        let g_render_system = &engine_globals[EngineGlobals::RenderSystem as usize];
+        let g_entity_trash = &engine_globals[EngineGlobals::EntityTrash as usize];
+        let g_screen = &engine_globals[EngineGlobals::Screen as usize];
+        let g_camera = &engine_globals[EngineGlobals::Camera as usize];
+        let g_efoo = &engine_globals[EngineGlobals::EFoo as usize];
+        let g_cfoo = &engine_globals[EngineGlobals::CFoo as usize];
+
+        // Systems manager
+        let sfoo_ident = Idents::SFoo.to_ident();
+        let sfoo_def = quote!(
+            pub struct #sfoo_ident {
+                pub gm: #gfoo_ident,
+                pub cm: #cfoo_ident,
+                events: #efoo_ident,
+                stack: Vec<std::collections::VecDeque<(#e_ident, usize)>>,
+                services: [Vec<Box<dyn Fn(&mut #cfoo_ident, &mut #gfoo_ident, &mut #efoo_ident)>>; #e_len_ident]
+            }
+
+            impl #sfoo_ident {
+                pub fn new() -> Self {
+                    let mut s = Self {
+                        gm: #gfoo_ident::new(),
+                        cm: #cfoo_ident::new(),
+                        events: #efoo_ident::new(),
+                        stack: Vec::new(),
+                        services: crate::ecs::shared::array_creator::ArrayCreator::create(|_| Vec::new())
+                    };
+                    s.init();
+                    sevents
+                }
+
+                // Init
+                fn init(&mut self) {
+                    // #(#i_fs(&mut self.cm, &mut self.gm, &mut self.events);)*
+                    self.post_tick();
+                    self.add_systems();
+                }
+
+                fn add_system(&mut self, e: #e_ident, f: Box<dyn Fn(&mut #cfoo_ident, &mut #gfoo_ident, &mut #efoo_ident)>) {
+                    self.services[e as usize].push(f);
+                }
+
+                fn add_systems(&mut self) {
+                    // #(
+                        // let (f) = #fs;
+                        // self.add_system(#e_ident::#e_v, Box::new(f));
+                    // )*
+                }
+
+                // Tick
+                pub fn run(&mut self) {
+                    static FPS: u32 = 60;
+                    static FRAME_TIME: u32 = 1000 / FPS;
+
+                    let mut t = unsafe { crate::sdl2::SDL_GetTicks() };
+                    let mut dt;
+                    let mut tsum: u64 = 0;
+                    let mut tcnt: u64 = 0;
+                    while !self.gm.#g_event.quit {
+                        dt = unsafe { crate::sdl2::SDL_GetTicks() } - t;
+                        t += dt;
+
+                        self.tick(dt);
+
+                        dt = unsafe { crate::sdl2::SDL_GetTicks() } - t;
+                        tsum += dt as u64;
+                        tcnt += 1;
+                        if dt < FRAME_TIME {
+                            unsafe { crate::sdl2::SDL_Delay(FRAME_TIME - dt) };
+                        }
+                    }
+
+                    println!("Average Frame Time: {}ms", tsum as f64 / tcnt as f64);
+                }
+
+                fn tick(&mut self, ts: u32) {
+                    // Update events
+                    self.gm.#g_event.update(ts, &self.gm.#g_camera.0, &self.gm.#g_screen.0);
+                    // Clear the screen
+                    self.gm.#g_render_system.r.clear();
+                    // Add initial events
+                    self.add_events(self.init_events(ts));
+                    while !self.stack.is_empty() {
+                        // Get element from next queue
+                        if let Some((e, i, n)) = self
+                            .stack
+                            // Get last queue
+                            .last_mut()
+                            // Get next events
+                            .and_then(|queue| queue.front_mut())
+                            // Check if the system exists
+                            .and_then(|(e, i)| {
+                                // Increment the event idx and return the old values
+                                let v_s = &self.services[*e as usize];
+                                v_s.get(*i).map(|_| {
+                                    let vals = (e.clone(), i.clone(), v_s.len());
+                                    *i += 1;
+                                    vals
+                                })
+                            })
+                        {
+                            // This is the last system for this event
+                            if i + 1 >= n {
+                                self.pop();
+                            }
+                            // Add a new queue for new events
+                            self.gm.#g_efoo = #efoo_ident::new();
+                            // Run the system
+                            if let Some(s) = self.services[e as usize].get(i) {
+                                (s)(&mut self.cm, &mut self.gm, &mut self.events);
+                            }
+                            // If this is the last system, remove the event
+                            if i + 1 >= n {
+                                self.events.pop(e);
+                            }
+                            // Add new events
+                            let events = std::mem::replace(&mut self.gm.#g_efoo, #efoo_ident::new());
+                            self.add_events(events);
+                        } else {
+                            // We're done with this event
+                            self.pop();
+                        }
+                    }
+                    // Display the screen
+                    self.gm.#g_render_system.r.present();
+
+                    self.post_tick();
+                }
+
+                fn post_tick(&mut self) {
+                    // Remove marked entities
+                    self.cm.remove(&mut self.gm.#g_entity_trash);
+                    // Add new entities
+                    self.cm.append(&mut self.gm.#g_cfoo);
+                }
+
+                fn init_events(&self, ts: u32) -> #efoo_ident {
+                    let mut events = #efoo_ident::new();
+                    events.new_event(CoreEvent::Events);
+                    events.new_event(CoreEvent::Update(ts));
+                    events.new_event(CoreEvent::Render);
+                    events
+                }
+
+                fn add_events(&mut self, mut em: #efoo_ident) {
+                    if em.has_events() {
+                        self.events.append(&mut em);
+                        self.stack.push(em.get_events());
+                    }
+                }
+
+                fn pop(&mut self) {
+                    // Remove top element and empty queue
+                    if self.stack.last_mut().is_some_and(|queue| {
+                        queue.pop_front();
+                        queue.is_empty()
+                    }) {
+                        self.stack.pop();
+                    }
+                }
+            }
+        );
+
         quote!(
             #deps_code
 
@@ -415,6 +602,8 @@ impl Decoder {
             #e_def
             #efoo_def
             #efoo_traits
+
+            #sfoo_def
         )
     }
 

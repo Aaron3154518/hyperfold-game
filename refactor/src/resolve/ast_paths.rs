@@ -1,94 +1,155 @@
+use crate::{decode::idents::Idents, util::JoinMap};
+
 use super::ast_resolve::Path;
 
+pub trait ExpandEnum<const N: usize>
+where
+    Self: Sized,
+{
+    const LEN: usize = N;
+    const VARIANTS: [Self; N];
+}
+
+pub trait GetPaths<const N: usize>: ExpandEnum<N> {
+    fn as_str(&self) -> &str;
+
+    fn get_path(&self) -> Vec<String> {
+        vec!["crate", self.as_str()].map_vec(|s| s.to_string())
+    }
+
+    fn to_paths(cr_idx: usize) -> [Path; N] {
+        Self::VARIANTS.map(|v| Path {
+            cr_idx,
+            path: v.get_path(),
+        })
+    }
+}
+
 #[macros::expand_enum]
-#[derive(Clone, Copy, Debug)]
-pub enum EnginePaths {
-    // Trait paths
+pub enum MacroPaths {
+    Component,
+    Global,
+    Event,
+    System,
+}
+
+impl GetPaths<{ Self::LEN }> for MacroPaths {
+    fn as_str(&self) -> &str {
+        match self {
+            MacroPaths::Component => "component",
+            MacroPaths::Global => "global",
+            MacroPaths::Event => "event",
+            MacroPaths::System => "system",
+        }
+    }
+}
+
+#[macros::expand_enum]
+pub enum EngineTraits {
     AddComponent,
     AddEvent,
-    // Struct paths
+}
+
+impl GetPaths<{ Self::LEN }> for EngineTraits {
+    fn as_str(&self) -> &str {
+        match self {
+            EngineTraits::AddComponent => "AddComponent",
+            EngineTraits::AddEvent => "AddEvent",
+        }
+    }
+}
+
+#[macros::expand_enum]
+pub enum EngineGlobals {
+    CFoo,
+    EFoo,
     Entity,
     EntityTrash,
+    Event,
+    RenderSystem,
+    Camera,
+    Screen,
+}
+
+impl GetPaths<{ Self::LEN }> for EngineGlobals {
+    fn as_str(&self) -> &str {
+        match self {
+            EngineGlobals::CFoo => Idents::CFoo.as_str(),
+            EngineGlobals::EFoo => Idents::EFoo.as_str(),
+            EngineGlobals::Entity => "Entity",
+            EngineGlobals::EntityTrash => "EntityTrash",
+            EngineGlobals::Event => "Event",
+            EngineGlobals::RenderSystem => "RenderSystem",
+            EngineGlobals::Camera => "Camera",
+            EngineGlobals::Screen => "Screen",
+        }
+    }
+
+    fn to_paths(cr_idx: usize) -> [Path; Self::LEN] {
+        Self::VARIANTS.map(|v| Path {
+            cr_idx: match v {
+                EngineGlobals::CFoo | EngineGlobals::EFoo => 0,
+                _ => cr_idx,
+            },
+            path: v.get_path(),
+        })
+    }
+}
+
+#[macros::expand_enum]
+pub enum EngineContainers {
     Container,
     Label,
     AndLabels,
     OrLabels,
     NandLabels,
     NorLabels,
-    // Macro paths
-    MacroComponent,
-    MacroGlobal,
-    MacroEvent,
-    MacroSystem,
 }
 
-impl EnginePaths {
-    pub fn as_str(&self) -> &str {
+impl GetPaths<{ Self::LEN }> for EngineContainers {
+    fn as_str(&self) -> &str {
         match self {
-            // Traits
-            EnginePaths::AddComponent => "AddComponent",
-            EnginePaths::AddEvent => "AddEvent",
-            // Structs
-            EnginePaths::Entity => "Entity",
-            EnginePaths::EntityTrash => "EntityTrash",
-            EnginePaths::Container => "Container",
-            EnginePaths::Label => "Label",
-            EnginePaths::AndLabels => "AndLabels",
-            EnginePaths::OrLabels => "OrLabels",
-            EnginePaths::NandLabels => "NandLabels",
-            EnginePaths::NorLabels => "NorLabels",
-            // Macros
-            EnginePaths::MacroComponent => "component",
-            EnginePaths::MacroGlobal => "global",
-            EnginePaths::MacroEvent => "event",
-            EnginePaths::MacroSystem => "system",
+            EngineContainers::Container => "Container",
+            EngineContainers::Label => "Label",
+            EngineContainers::AndLabels => "AndLabels",
+            EngineContainers::OrLabels => "OrLabels",
+            EngineContainers::NandLabels => "NandLabels",
+            EngineContainers::NorLabels => "NorLabels",
         }
-    }
-
-    pub fn get_path(&self) -> Vec<String> {
-        vec!["crate", self.as_str()]
-            .iter()
-            .map(|s| s.to_string())
-            .collect()
-    }
-
-    pub fn to_paths(engine_cr_idx: usize) -> [Path; Self::len()] {
-        Self::variants().map(|ep| Path {
-            cr_idx: engine_cr_idx,
-            path: ep.get_path(),
-        })
     }
 }
 
-// Macros for defining subsets of engine paths
-macro_rules! engine_paths {
-    ($n: ident, $($vs: ident),*) => {
-        #[macros::expand_enum]
-        #[derive(Clone, Copy, Debug)]
-        pub enum $n {
-            $($vs),*
-        }
-
-        impl $n {
-            pub fn map(&self) -> EnginePaths {
-                match self {
-                    $(Self::$vs => EnginePaths::$vs),*
-                }
-            }
-
-            pub fn get_paths(paths: &[Path; EnginePaths::len()]) -> [Path; Self::len()] {
-                Self::variants().map(|v| paths[v.map() as usize].to_owned())
-            }
-
-            pub fn to_paths(engine_cr_idx: usize) -> [Path; Self::len()] {
-                Self::get_paths(&EnginePaths::to_paths(engine_cr_idx))
-            }
-        }
-    };
+#[derive(Clone, Debug)]
+pub struct Paths {
+    pub macros: [Path; MacroPaths::LEN],
+    pub traits: [Path; EngineTraits::LEN],
+    pub globals: [Path; EngineGlobals::LEN],
+    pub containers: [Path; EngineContainers::LEN],
 }
 
-// Paths needed by all crates
-engine_paths!(CrateEnginePaths, AddComponent, AddEvent);
+impl Paths {
+    pub fn new(engine_cr_idx: usize, macros_cr_idx: usize) -> Self {
+        Self {
+            macros: MacroPaths::to_paths(macros_cr_idx),
+            traits: EngineTraits::to_paths(engine_cr_idx),
+            globals: EngineGlobals::to_paths(engine_cr_idx),
+            containers: EngineContainers::to_paths(engine_cr_idx),
+        }
+    }
 
-// Paths needed by only entry crate
-engine_paths!(EntryEnginePaths, Entity, EntityTrash);
+    pub fn get_macro(&self, i: MacroPaths) -> &Path {
+        &self.macros[i as usize]
+    }
+
+    pub fn get_trait(&self, i: EngineTraits) -> &Path {
+        &self.traits[i as usize]
+    }
+
+    pub fn get_global(&self, i: EngineGlobals) -> &Path {
+        &self.globals[i as usize]
+    }
+
+    pub fn get_container(&self, i: EngineContainers) -> &Path {
+        &self.containers[i as usize]
+    }
+}

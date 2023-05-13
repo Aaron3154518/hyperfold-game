@@ -12,8 +12,8 @@ use util::SplitCollect;
 
 use crate::{
     decode::decoder::Decoder,
-    resolve::{ast_items::ItemsCrate, ast_paths::EnginePaths},
-    util::format_code,
+    resolve::{ast_items::ItemsCrate, ast_paths::Paths},
+    util::{end, format_code, JoinMapInto},
     validate::ast_validate::ItemData,
 };
 
@@ -70,23 +70,32 @@ fn test_resolves(crates: &Vec<Crate>) {
 }
 
 fn main() {
-    let crates = Crate::parse(PathBuf::from("test/a"));
+    let (crates, paths) = Crate::parse(PathBuf::from("test/a"));
+    println!(
+        "{:#?}",
+        crates
+            .iter()
+            .enumerate()
+            .map_vec(|(i, cr)| format!("{}: {}", i, cr.name))
+    );
     // println!("{:#?}", crates);
-
-    let engine_dir =
-        fs::canonicalize(PathBuf::from("engine")).expect("Could not canonicalize engine path");
-    let paths = crates
-        .iter()
-        .find_map(|cr| (cr.dir == engine_dir).then_some(EnginePaths::to_paths(cr.idx)))
-        .expect("Could not find engine crate. Please include it");
 
     // test_resolves(&crates);
 
-    let mut items = crates
+    // Skip macros crate for resolution phase
+    let mut items = crates[..end(&crates, 1)]
         .iter()
         .map(|cr| {
             let mut ic = ItemsCrate::new();
             ic.parse_crate(cr, &paths, &crates);
+            // Remove macros crate as crate dependency
+            if let Some(i) = ic
+                .dependencies
+                .iter()
+                .position(|d| d.cr_idx == crates.len() - 1)
+            {
+                ic.dependencies.swap_remove(i);
+            }
             ic
         })
         .collect::<Vec<_>>();
