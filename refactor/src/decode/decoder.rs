@@ -20,7 +20,7 @@ use super::{
     dependency::Dependency,
     event::{self, Event},
     idents::Idents,
-    system::{ContainerArg, FnArg, LabelType, System},
+    system::{ContainerArg, FnArg, LabelType, System, SystemRegexes},
 };
 
 #[derive(Debug)]
@@ -95,95 +95,12 @@ impl Decoder {
         }
     }
 
-    fn get_systems(&self, cr_idx: usize, cr_alias: String) -> Vec<System> {
-        let id = r"id";
-        let c = r"c\d+_\d+";
-        let g = r"g\d+_\d+";
-        let e = r"e\d+_\d+_\d+";
-        let l = format!(r"l(!)?[\|&]{c}(-{c})*");
-        let v_c = format!(r"(m)?{c}");
-        let v_i = format!(r"{v_c}|{id}");
-        let v = format!(r"v({v_i})(-({v_i}))*");
-
-        let [id_reg, c_reg, g_reg, e_reg, l_reg, v_c_reg, v_reg] = [id, c, g, e, &l, &v_c, &v].map(
-            |r_str| Regex::new(format!(r"^{r_str}$").as_str()).catch(format!("Could not create regex: \"^{r_str}$\""))
-        );
-
-        let arg = format!(r"{id}|{c}|{g}|{e}|{l}|{v}");
-        let sys_reg = Regex::new(format!(r"(?P<name>\w+)\((?P<args>(({arg})(:({arg}))*)?)\)").as_str())
-            .expect("Could not create system regex");
+    fn get_systems(&self, cr_idx: usize, cr_path: &syn::Path) -> Vec<System> {
+        let regexes = SystemRegexes::new();
 
         match self.get_crate_data(Data::Systems, cr_idx).as_str() {
             "" => Vec::new(),
-            data => data
-                .split(",")
-                .map(|s| {
-                    sys_reg
-                        .captures(s)
-                        .and_then(|c| c.name("name").zip(c.name("args")))
-                        .map(|(name, args)| {
-                            let path = format!("{cr_alias}::{}", name.as_str());
-                            System {
-                                path: syn::parse_str(path.as_str())
-                                    .catch(format!("Could not parse system name: {path}")),
-                                args: match args.as_str() {
-                                    "" => Vec::new(),
-                                    s => s.split_map(":", |a| {
-                                        // Entity id
-                                        id_reg.find(a)
-                                            .map(|_| FnArg::EntityId)
-                                            // Component
-                                            .or_else(|| {
-                                                c_reg.find(a)
-                                                    .map(|_| FnArg::Component(format_ident!("{a}")))
-                                            })
-                                            // Global
-                                            .or_else(|| {
-                                                g_reg.find(a).map(|_| FnArg::Global(format_ident!("{a}")))
-                                            })
-                                            // Event
-                                            .or_else(|| {
-                                                e_reg.find(a).map(|_| FnArg::Event(format_ident!("{a}")))
-                                            })
-                                            // Label
-                                            .or_else(|| {
-                                                l_reg.find(a).map(|_| FnArg::Label(LabelType::from(a), 
-                                                    a.trim_start_matches([
-                                                        'l','!','&','|'
-                                                    ]).split_map("-", |a| {
-                                                        c_reg.find(a).map(|_| format_ident!("{a}")).catch(format!("Could not parse label type: {a}"))
-                                                    })
-                                                ))
-                                            })
-                                            // Container
-                                            .or_else(|| {
-                                                v_reg.find(a).map(|_| {
-                                                    FnArg::Container(a.split_at(1).split_into(
-                                                        |_, args| {
-                                                            args.split_map("-", |a| {
-                                                                id_reg.find(a)
-                                                                    .map(|_| ContainerArg::EntityId)
-                                                                    .or_else(|| {
-                                                                        v_c_reg.find(a).map(|_| {
-                                                                            ContainerArg::Component(
-                                                                                a.starts_with("m"),
-                                                                                format_ident!("{}", a.trim_start_matches("m")),
-                                                                            )
-                                                                        })
-                                                                    }).catch(format!("Could not parse container item: {a}"))
-                                                            })
-                                                        },
-                                                    ))
-                                                })
-                                            })
-                                            .catch(format!("Could not parse system argument: {a}"))
-                                    }),
-                                }
-                            }
-                        })
-                        .catch(format!("Could not parse system: {s}"))
-                })
-                .collect(),
+            data => data.split_map(",", |s| System::parse(cr_path, s, &regexes)),
         }
     }
 
@@ -529,24 +446,35 @@ impl Decoder {
         let g_cfoo = &engine_globals[EngineGlobals::CFoo as usize];
 
         // Systems
-        let systems = crate_paths.iter().enumerate().fold(
-            Vec::new(),
-            |mut v, (cr_idx, cr_path)| {
-                v.append(&mut self.get_systems(cr_idx, String::new()));
-                v
-            },
-        );
-        for s in systems.iter() {
-            println!("{}({:#?})", s.path.to_token_stream().to_string(), s.args)
-        }
+        let systems =
+            crate_paths
+                .iter()
+                .enumerate()
+                .fold(Vec::new(), |mut v, (cr_idx, cr_path)| {
+                    v.append(&mut self.get_systems(cr_idx, cr_path));
+                    v
+                });
+        let init_systems_code = systems
+            .iter()
+            .filter(|s| s.is_init)
+            .map(|s| s.to_quote())
+            .collect::<Vec<_>>();
+        let systems_code = systems
+            .iter()
+            .filter(|s| !s.is_init)
+            .map(|s| s.to_quote())
+            .collect::<Vec<_>>();
+
+        let [cfoo, gfoo, efoo] =
+            [Idents::GenCFoo, Idents::GenGFoo, Idents::GenEFoo].map(|i| i.to_ident());
 
         // Systems manager
         let sfoo_ident = Idents::SFoo.to_ident();
         let sfoo_def = quote!(
             pub struct #sfoo_ident {
-                pub gm: #gfoo_ident,
-                pub cm: #cfoo_ident,
-                events: #efoo_ident,
+                #cfoo: #gfoo_ident,
+                #gfoo: #cfoo_ident,
+                #efoo: #efoo_ident,
                 stack: Vec<std::collections::VecDeque<(#e_ident, usize)>>,
                 services: [Vec<Box<dyn Fn(&mut #cfoo_ident, &mut #gfoo_ident, &mut #efoo_ident)>>; #e_len_ident]
             }
@@ -554,9 +482,9 @@ impl Decoder {
             impl #sfoo_ident {
                 pub fn new() -> Self {
                     let mut s = Self {
-                        gm: #gfoo_ident::new(),
-                        cm: #cfoo_ident::new(),
-                        events: #efoo_ident::new(),
+                        #cfoo: #cfoo_ident::new(),
+                        #gfoo: #gfoo_ident::new(),
+                        #efoo: #efoo_ident::new(),
                         stack: Vec::new(),
                         services: crate::ecs::shared::array_creator::ArrayCreator::create(|_| Vec::new())
                     };
@@ -566,7 +494,7 @@ impl Decoder {
 
                 // Init
                 fn init(&mut self) {
-                    // #(#i_fs(&mut self.cm, &mut self.gm, &mut self.events);)*
+                    #(#init_systems_code)*
                     self.post_tick();
                     self.add_systems();
                 }
@@ -576,10 +504,7 @@ impl Decoder {
                 }
 
                 fn add_systems(&mut self) {
-                    // #(
-                        // let (f) = #fs;
-                        // self.add_system(#e_ident::#e_v, Box::new(f));
-                    // )*
+                    #(#systems_code)*
                 }
 
                 // Tick
@@ -591,7 +516,7 @@ impl Decoder {
                     let mut dt;
                     let mut tsum: u64 = 0;
                     let mut tcnt: u64 = 0;
-                    while !self.gm.#g_event.quit {
+                    while !self.#gfoo.#g_event.quit {
                         dt = unsafe { crate::sdl2::SDL_GetTicks() } - t;
                         t += dt;
 
@@ -609,11 +534,11 @@ impl Decoder {
                 }
 
                 fn tick(&mut self, ts: u32) {
-                    // Update events
-                    self.gm.#g_event.update(ts, &self.gm.#g_camera.0, &self.gm.#g_screen.0);
+                    // Update #efoo
+                    self.#gfoo.#g_event.update(ts, &self.#gfoo.#g_camera.0, &self.#gfoo.#g_screen.0);
                     // Clear the screen
-                    self.gm.#g_render_system.r.clear();
-                    // Add initial events
+                    self.#gfoo.#g_render_system.r.clear();
+                    // Add initial #efoo
                     self.add_events(self.init_events(ts));
                     while !self.stack.is_empty() {
                         // Get element from next queue
@@ -621,7 +546,7 @@ impl Decoder {
                             .stack
                             // Get last queue
                             .last_mut()
-                            // Get next events
+                            // Get next #efoo
                             .and_then(|queue| queue.front_mut())
                             // Check if the system exists
                             .and_then(|(e, i)| {
@@ -638,48 +563,48 @@ impl Decoder {
                             if i + 1 >= n {
                                 self.pop();
                             }
-                            // Add a new queue for new events
-                            self.gm.#g_efoo = #efoo_ident::new();
+                            // Add a new queue for new #efoo
+                            self.#gfoo.#g_efoo = #efoo_ident::new();
                             // Run the system
                             if let Some(s) = self.services[e as usize].get(i) {
-                                (s)(&mut self.cm, &mut self.gm, &mut self.events);
+                                (s)(&mut self.#cfoo, &mut self.#gfoo, &mut self.#efoo);
                             }
                             // If this is the last system, remove the event
                             if i + 1 >= n {
-                                self.events.pop(e);
+                                self.#efoo.pop(e);
                             }
-                            // Add new events
-                            let events = std::mem::replace(&mut self.gm.#g_efoo, #efoo_ident::new());
-                            self.add_events(events);
+                            // Add new #efoo
+                            let #efoo = std::mem::replace(&mut self.#gfoo.#g_efoo, #efoo_ident::new());
+                            self.add_events(#efoo);
                         } else {
                             // We're done with this event
                             self.pop();
                         }
                     }
                     // Display the screen
-                    self.gm.#g_render_system.r.present();
+                    self.#gfoo.#g_render_system.r.present();
 
                     self.post_tick();
                 }
 
                 fn post_tick(&mut self) {
                     // Remove marked entities
-                    self.cm.remove(&mut self.gm.#g_entity_trash);
+                    self.#cfoo.remove(&mut self.#gfoo.#g_entity_trash);
                     // Add new entities
-                    self.cm.append(&mut self.gm.#g_cfoo);
+                    self.#cfoo.append(&mut self.#gfoo.#g_cfoo);
                 }
 
                 fn init_events(&self, ts: u32) -> #efoo_ident {
-                    let mut events = #efoo_ident::new();
-                    events.new_event(CoreEvent::Events);
-                    events.new_event(CoreEvent::Update(ts));
-                    events.new_event(CoreEvent::Render);
-                    events
+                    let mut #efoo = #efoo_ident::new();
+                    #efoo.new_event(CoreEvent::Events);
+                    #efoo.new_event(CoreEvent::Update(ts));
+                    #efoo.new_event(CoreEvent::Render);
+                    #efoo
                 }
 
                 fn add_events(&mut self, mut em: #efoo_ident) {
                     if em.has_events() {
-                        self.events.append(&mut em);
+                        self.#efoo.append(&mut em);
                         self.stack.push(em.get_events());
                     }
                 }

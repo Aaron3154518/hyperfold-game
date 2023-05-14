@@ -21,20 +21,35 @@ pub enum Idents {
     EFoo,
     E,
     ELen,
+    // Code generation
+    GenE,
+    GenV,
+    GenEid,
+    GenEids,
+    GenCFoo,
+    GenGFoo,
+    GenEFoo,
 }
 
 impl Idents {
     pub fn as_str(&self) -> &str {
         match self {
-            Self::Namespace => NAMESPACE,
-            Self::SFoo => "SFoo",
-            Self::GFoo => "GFoo",
-            Self::AddComponent => EngineTraits::AddComponent.as_str(),
-            Self::CFoo => "CFoo",
-            Self::AddEvent => EngineTraits::AddEvent.as_str(),
-            Self::EFoo => "EFoo",
-            Self::E => "E",
-            Self::ELen => "E_LEN",
+            Idents::Namespace => NAMESPACE,
+            Idents::SFoo => "SFoo",
+            Idents::GFoo => "GFoo",
+            Idents::AddComponent => EngineTraits::AddComponent.as_str(),
+            Idents::CFoo => "CFoo",
+            Idents::AddEvent => EngineTraits::AddEvent.as_str(),
+            Idents::EFoo => "EFoo",
+            Idents::E => "E",
+            Idents::ELen => "E_LEN",
+            Idents::GenE => "e",
+            Idents::GenV => "v",
+            Idents::GenEid => "eid",
+            Idents::GenEids => "eids",
+            Idents::GenCFoo => "cfoo",
+            Idents::GenGFoo => "gfoo",
+            Idents::GenEFoo => "efoo",
         }
     }
 

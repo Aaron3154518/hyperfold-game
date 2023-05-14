@@ -177,36 +177,74 @@ impl<T, U, V> SplitIter<T, U, V> for (T, U) {
 
 // Splitting string into list
 pub trait SplitCollect {
-    fn split_collect(&self, sep: &str) -> Vec<String>;
-
-    fn split_map<F, T>(&self, sep: &str, f: F) -> Vec<T>
+    fn split_collect<V>(&self, sep: &str) -> V
     where
-        F: FnMut(&str) -> T;
+        V: FromIterator<String>;
+
+    fn split_map<F, T, V>(&self, sep: &str, f: F) -> V
+    where
+        F: FnMut(&str) -> T,
+        V: FromIterator<T>;
 }
 
 impl SplitCollect for String {
-    fn split_collect(&self, sep: &str) -> Vec<String> {
+    fn split_collect<V>(&self, sep: &str) -> V
+    where
+        V: FromIterator<String>,
+    {
         self.split(sep).map(|s| s.to_string()).collect()
     }
 
-    fn split_map<F, T>(&self, sep: &str, f: F) -> Vec<T>
+    fn split_map<F, T, V>(&self, sep: &str, f: F) -> V
     where
         F: FnMut(&str) -> T,
+        V: FromIterator<T>,
     {
         self.split(sep).map(f).collect()
     }
 }
 
 impl SplitCollect for str {
-    fn split_collect(&self, sep: &str) -> Vec<String> {
+    fn split_collect<V>(&self, sep: &str) -> V
+    where
+        V: FromIterator<String>,
+    {
         self.split(sep).map(|s| s.to_string()).collect()
     }
 
-    fn split_map<F, T>(&self, sep: &str, f: F) -> Vec<T>
+    fn split_map<F, T, V>(&self, sep: &str, f: F) -> V
     where
         F: FnMut(&str) -> T,
+        V: FromIterator<T>,
     {
         self.split(sep).map(f).collect()
+    }
+}
+
+// Flatten 2D -> 1D
+pub trait Flatten<'a, T>
+where
+    T: 'a,
+{
+    fn flatten<V>(self, v: V) -> V
+    where
+        V: Extend<&'a T>;
+}
+
+impl<'a, A, B, T> Flatten<'a, T> for A
+where
+    A: IntoIterator<Item = B>,
+    B: IntoIterator<Item = &'a T>,
+    T: 'a,
+{
+    fn flatten<V>(self, v: V) -> V
+    where
+        V: Extend<&'a T>,
+    {
+        self.into_iter().fold(v, |mut v, t| {
+            v.extend(t.into_iter());
+            v
+        })
     }
 }
 
@@ -274,7 +312,7 @@ pub fn brackets(s: String) -> String {
             r_i = r_is.next();
             if cnt == 1 {
                 let mid = brackets(s[idx1 + 1..r].to_string())
-                    .split_collect("\n")
+                    .split_collect::<Vec<_>>("\n")
                     .join("\n\t");
                 return format!(
                     "{}{{{}}}{}{}",
