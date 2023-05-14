@@ -25,14 +25,23 @@ use super::{
 // Map system arg paths to items
 #[shared::macros::expand_enum]
 pub enum Data {
+    // List of component paths relative to their crate
     Components,
+    // List of global paths relative to their crate
     Globals,
+    // Crate index and global index for certain globals (see EngineGlobals)
     EngineGlobals,
+    // List of trait paths relative to each crate (see EngineTraits)
     EngineTraits,
+    // List of event paths relative to their crate
     Events,
+    // List of system paths relative to their crate
     Systems,
+    // Directory of each crate with a list of dependencies, including alias and crate index
     Dependencies,
+    // Path from entry crate to every other crate
     CratePaths,
+    // Index of engine crate
     EngineCrateIdx,
 }
 

@@ -1,7 +1,7 @@
 use quote::format_ident;
 
 use crate::{
-    codegen::idents::Idents,
+    codegen::{idents::Idents, util::vec_to_path},
     util::{end, JoinMap},
     validate::constants::NAMESPACE,
 };
@@ -27,6 +27,10 @@ pub trait GetPaths<const N: usize>: ExpandEnum<N> {
     // path
     fn as_path(&self) -> Vec<&str> {
         Vec::new()
+    }
+
+    fn to_path(&self) -> syn::Path {
+        vec_to_path(self.path_stem())
     }
 
     // path::ident

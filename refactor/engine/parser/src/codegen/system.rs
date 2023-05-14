@@ -50,8 +50,8 @@ impl From<&str> for LabelType {
 
 #[derive(Clone, Debug)]
 pub enum ContainerArg {
-    EntityId(TokenStream),
-    Component(TokenStream, syn::Ident, bool),
+    EntityId,
+    Component(syn::Ident, bool),
 }
 
 pub enum FnArg {
@@ -128,8 +128,6 @@ impl SystemRegexes {
     }
 
     pub fn parse_arg(&self, arg_str: &str) -> Option<FnArg> {
-        let eid_type = format_ident!("{}", EngineGlobals::Entity.as_ident());
-
         // Entity id
         self.id
             .find(arg_str)
@@ -175,18 +173,12 @@ impl SystemRegexes {
                         args.split_map("-", |a| {
                             self.id
                                 .find(a)
-                                .map(|_| ContainerArg::EntityId(quote!(&#eid_type)))
+                                .map(|_| ContainerArg::EntityId)
                                 .or_else(|| {
                                     self.vec_comp.find(a).map(|_| {
-                                        let is_mut = a.starts_with("m");
-                                        let mut_tok =
-                                            if is_mut { (quote!(mut)) } else { (quote!()) };
-                                        // TODO:
-                                        let ty = quote!();
                                         ContainerArg::Component(
-                                            quote!(&#mut_tok #ty),
                                             format_ident!("{}", a.trim_start_matches("m")),
-                                            is_mut,
+                                            a.starts_with("m"),
                                         )
                                     })
                                 })
@@ -235,7 +227,8 @@ impl System {
             is_init,
         };
 
-        let [gfoo, e_ident] = [Idents::GenGFoo, Idents::GenE].map(|i| i.to_ident());
+        let [gfoo, e_ident, eid] =
+            [Idents::GenGFoo, Idents::GenE, Idents::GenEid].map(|i| i.to_ident());
 
         s.args = match args.as_str() {
             "" => Vec::new(),
@@ -246,7 +239,7 @@ impl System {
                         .parse_arg(a)
                         .catch(format!("Could not parse system argument: {a}"))
                     {
-                        FnArg::EntityId => quote!(id),
+                        FnArg::EntityId => quote!(#eid),
                         FnArg::Component(c) => {
                             let tt = quote!(#c);
                             s.c_args.push(c);
@@ -275,8 +268,8 @@ impl System {
                             (s.c_args, s.v_types) = args
                                 .into_iter()
                                 .map(|a| match &a {
-                                    ContainerArg::EntityId(ty) => (Idents::GenEids.to_ident(), a),
-                                    ContainerArg::Component(ty, c, m) => (c.to_owned(), a),
+                                    ContainerArg::EntityId => (Idents::GenEids.to_ident(), a),
+                                    ContainerArg::Component(c, m) => (c.to_owned(), a),
                                 })
                                 .unzip();
                             quote!(v)
@@ -370,7 +363,11 @@ impl System {
         }
     }
 
-    pub fn to_quote(&self, engine_crate_path: &syn::Path) -> TokenStream {
+    pub fn to_quote(
+        &self,
+        engine_crate_path: &syn::Path,
+        components: &Vec<Vec<TokenStream>>,
+    ) -> TokenStream {
         let f = &self.name;
         let args = &self.args;
 
@@ -393,21 +390,46 @@ impl System {
                 }
             )
         } else {
+            let eid = EngineGlobals::Entity.to_path();
+
             // Container argument types
             let v_types = self
                 .v_types
                 .iter()
                 .map(|a| match a {
-                    ContainerArg::EntityId(ty) => ty,
-                    ContainerArg::Component(ty, _, _) => ty,
+                    ContainerArg::EntityId => quote!(&#engine_crate_path::#eid),
+                    ContainerArg::Component(i, m) => i
+                        .to_string()
+                        .trim_start_matches("c")
+                        .split_once("_")
+                        .map(|(cr_idx, c_idx)| {
+                            (
+                                cr_idx
+                                    .parse::<usize>()
+                                    .catch(format!("Could not parse crate index: {cr_idx}")),
+                                c_idx
+                                    .parse::<usize>()
+                                    .catch(format!("Could not parse component index: {c_idx}")),
+                            )
+                        })
+                        .map(|(cr_idx, c_idx)| {
+                            let c_ty = components
+                                .get(cr_idx)
+                                .catch(format!("Invalid crate index: {cr_idx}"))
+                                .get(c_idx)
+                                .catch(format!("Invalid component index: {c_idx}"));
+                            let mut_tok = if *m { quote!(mut) } else { quote!() };
+                            quote!(&#mut_tok #c_ty)
+                        })
+                        .catch(format!("Could not split component variable: {i}")),
                 })
                 .collect::<Vec<_>>();
             // Get first argument to initialize the result hashmap
             let arg = self.c_args.first().expect("No first component");
             let nones = ["None"].repeat(self.v_types.len() - 1).join(",");
             let (iter, tuple_init) = match self.v_types.first().expect("No first vector types") {
-                ContainerArg::EntityId(_) => ("iter", format!("|k| (k, (None, {}))", nones)),
-                ContainerArg::Component(_, _, m) => (
+                ContainerArg::EntityId => ("iter", format!("|k| (k, (None, {}))", nones)),
+                ContainerArg::Component(_, m) => (
                     if *m { "iter_mut" } else { "iter" },
                     format!("|(k, v)| (k, (Some(v), {}))", nones),
                 ),
@@ -425,8 +447,8 @@ impl System {
                 .zip(self.v_types[1..].iter())
                 .enumerate()
                 .filter_map(|(i, (a, ty))| match ty {
-                    ContainerArg::EntityId(_) => None,
-                    ContainerArg::Component(_, _, m) => {
+                    ContainerArg::EntityId => None,
+                    ContainerArg::Component(_, m) => {
                         let intersect = vec_to_path(
                             if *m {
                                 EngineIdents::IntersectMut
@@ -457,8 +479,8 @@ impl System {
                 .map(|(i, (_v, ty))| {
                     let v_i = format_ident!("v{}", i);
                     match ty {
-                        ContainerArg::EntityId(_) => (v_i, eid.to_owned()),
-                        ContainerArg::Component(_, _, _) => {
+                        ContainerArg::EntityId => (v_i, eid.to_owned()),
+                        ContainerArg::Component(_, _) => {
                             c_vars.push(v_i.to_owned());
                             (v_i.to_owned(), v_i)
                         }
@@ -468,12 +490,11 @@ impl System {
 
             let label_checks = self.quote_labels(quote!(return Some((#(#all_args,)*));));
 
-            //(#(Option<#v_types>,)*)
             quote!(
                 let mut #v = cfoo.#arg
                     .#iter()
                     .map(#tuple_init)
-                    .collect::<std::collections::HashMap<_, _>>();
+                    .collect::<std::collections::HashMap<_, (#(Option<#v_types>,)*)>>();
                 #(#v = #intersect_stmts;)*
                 let #v = #v
                     .into_iter()

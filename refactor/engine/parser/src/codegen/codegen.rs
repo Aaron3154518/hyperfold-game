@@ -221,20 +221,25 @@ impl Decoder {
         let crate_paths = self.get_crate_paths();
         let crate_paths_post = deps_lrn.map_vec(|i| &crate_paths[*i]);
 
+        // GEt component types by crate for system codegen
+        let mut crate_c_tys = Vec::new();
         // Get all globals and components
         let (mut c_tys, mut c_vars) = (Vec::new(), Vec::new());
         let (mut g_tys, mut g_vars) = (Vec::new(), Vec::new());
         let (mut e_tys, mut e_vars, mut e_varis) = (Vec::new(), Vec::new(), Vec::new());
         for (cr_idx, cr_path) in crate_paths.iter().enumerate() {
-            for (i, path) in self
-                .split_crate_data(Data::Components, cr_idx, ",")
-                .into_iter()
-                .enumerate()
-            {
-                let path = parse_type(path);
-                c_tys.push(quote!(#cr_path::#path));
-                c_vars.push(format_ident!("{}", component_var(cr_idx, i)));
-            }
+            crate_c_tys.push(
+                self.split_crate_data(Data::Components, cr_idx, ",")
+                    .into_iter()
+                    .enumerate()
+                    .map_vec(|(i, path)| {
+                        let path = parse_type(path);
+                        let ty = quote!(#cr_path::#path);
+                        c_tys.push(ty.to_owned());
+                        c_vars.push(format_ident!("{}", component_var(cr_idx, i)));
+                        ty
+                    }),
+            );
             for (i, path) in self
                 .split_crate_data(Data::Globals, cr_idx, ",")
                 .into_iter()
@@ -433,17 +438,17 @@ impl Decoder {
         let init_systems_code = systems
             .iter()
             .filter(|s| s.is_init)
-            .map(|s| s.to_quote(engine_cr_path))
+            .map(|s| s.to_quote(engine_cr_path, &crate_c_tys))
             .collect::<Vec<_>>();
         let systems_code = systems
             .iter()
             .filter(|s| !s.is_init)
-            .map(|s| s.to_quote(engine_cr_path))
+            .map(|s| s.to_quote(engine_cr_path, &crate_c_tys))
             .collect::<Vec<_>>();
 
         let [cfoo, gfoo, efoo] =
             [Idents::GenCFoo, Idents::GenGFoo, Idents::GenEFoo].map(|i| i.to_ident());
-        let init_events = [
+        let [core_update, core_events, core_render] = [
             EngineIdents::CoreUpdate,
             EngineIdents::CoreEvents,
             EngineIdents::CoreRender,
@@ -578,7 +583,9 @@ impl Decoder {
 
                 fn init_events(&self, ts: u32) -> #efoo_ident {
                     let mut #efoo = #efoo_ident::new();
-                    #(#add_event_tr::new_event(&mut #efoo, #engine_cr_path::#init_events);)*
+                    #add_event_tr::new_event(&mut #efoo, #engine_cr_path::#core_events);
+                    #add_event_tr::new_event(&mut #efoo, #engine_cr_path::#core_update(ts));
+                    #add_event_tr::new_event(&mut #efoo, #engine_cr_path::#core_render);
                     #efoo
                 }
 
