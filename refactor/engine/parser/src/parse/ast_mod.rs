@@ -211,6 +211,8 @@ impl Mod {
     }
 }
 
+// TODO: Ambiguous paths, :: paths
+
 // Use paths
 impl Mod {
     fn visit_item_use(&mut self, i: &syn::ItemUse) {

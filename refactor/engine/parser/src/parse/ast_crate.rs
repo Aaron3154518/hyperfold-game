@@ -15,11 +15,12 @@ use crate::{
     util::{Catch, SplitIter},
 };
 
-const ENGINE: &str = "engine";
+// TODO: hardcoded
+const ENGINE: &str = "../engine";
 const MACROS: &str = "macros";
 
 pub fn get_engine_dir() -> PathBuf {
-    fs::canonicalize(PathBuf::from(ENGINE)).expect("Could not canonicalize engine macros path")
+    fs::canonicalize(PathBuf::from(ENGINE)).expect("Could not canonicalize engine crate path")
 }
 
 pub fn get_macros_dir() -> PathBuf {

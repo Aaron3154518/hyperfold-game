@@ -3,6 +3,8 @@ use std::marker::PhantomData;
 // The path resolver can't find the macro paths in "macros" so they will be labelled under "engine"
 pub use macros::*;
 
+game_crate!();
+
 // Important globals
 #[global]
 pub struct Entity;

@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 syn = "2.0.15"
+shared_macros = { path = "./macros" }

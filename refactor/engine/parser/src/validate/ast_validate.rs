@@ -23,7 +23,7 @@ use super::{
 
 // Pass 3: Item validation
 // Map system arg paths to items
-#[macros::expand_enum]
+#[shared::macros::expand_enum]
 pub enum Data {
     Components,
     Globals,

@@ -1,4 +1,4 @@
-use crate::{decode::idents::Idents, util::JoinMap};
+use crate::{codegen::idents::Idents, util::JoinMap};
 
 use super::ast_resolve::Path;
 
@@ -25,7 +25,7 @@ pub trait GetPaths<const N: usize>: ExpandEnum<N> {
     }
 }
 
-#[macros::expand_enum]
+#[shared::macros::expand_enum]
 pub enum MacroPaths {
     Component,
     Global,
@@ -44,7 +44,7 @@ impl GetPaths<{ Self::LEN }> for MacroPaths {
     }
 }
 
-#[macros::expand_enum]
+#[shared::macros::expand_enum]
 pub enum EngineTraits {
     AddComponent,
     AddEvent,
@@ -59,7 +59,7 @@ impl GetPaths<{ Self::LEN }> for EngineTraits {
     }
 }
 
-#[macros::expand_enum]
+#[shared::macros::expand_enum]
 pub enum EngineGlobals {
     CFoo,
     EFoo,
@@ -96,7 +96,7 @@ impl GetPaths<{ Self::LEN }> for EngineGlobals {
     }
 }
 
-#[macros::expand_enum]
+#[shared::macros::expand_enum]
 pub enum EngineContainers {
     Container,
     Label,

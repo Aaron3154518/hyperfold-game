@@ -5,7 +5,7 @@ use crate::{
     validate::constants::NAMESPACE,
 };
 
-#[macros::expand_enum]
+#[shared::macros::expand_enum]
 pub enum Idents {
     // General
     Namespace,

@@ -1,5 +1,5 @@
 [package]
-name = "refactor"
+name = "parser"
 version = "0.1.0"
 edition = "2021"
 
@@ -12,5 +12,4 @@ quote = "1.0.26"
 regex = "1.8.1"
 syn = { version = "2.0.15", features = ["full", "visit"] }
 toml = "0.7.3"
-macros = { path = "./engine/macros" }
-shared = { path = "./engine/shared" }
+shared = { path = "../shared" }

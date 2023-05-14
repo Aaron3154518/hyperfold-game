@@ -6,7 +6,7 @@ use regex::Regex;
 use syn::{PathArguments, PathSegment};
 
 use crate::{
-    decode::dependency::get_deps_post_order,
+    codegen::dependency::get_deps_post_order,
     resolve::ast_paths::{EngineGlobals, EngineTraits, ExpandEnum, GetPaths},
     util::{Catch, JoinMap, JoinMapInto, SplitCollect, SplitIter},
     validate::{

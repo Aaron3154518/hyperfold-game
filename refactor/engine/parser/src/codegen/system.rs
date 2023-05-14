@@ -7,9 +7,9 @@ use quote::format_ident;
 use quote::quote;
 use regex::Regex;
 
-use crate::decode::idents::Idents;
-use crate::decode::util::string_to_type;
-use crate::decode::util::type_to_type;
+use crate::codegen::idents::Idents;
+use crate::codegen::util::string_to_type;
+use crate::codegen::util::type_to_type;
 use crate::resolve::ast_paths::EngineGlobals;
 use crate::resolve::ast_paths::GetPaths;
 use crate::util::Flatten;
@@ -19,7 +19,7 @@ use crate::{
     util::{Catch, SplitCollect, SplitIter},
 };
 
-#[macros::expand_enum]
+#[shared::macros::expand_enum]
 pub enum LabelType {
     And,
     Or,

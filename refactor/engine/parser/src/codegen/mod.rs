@@ -1,5 +1,5 @@
+pub mod codegen;
 pub mod component;
-pub mod decoder;
 pub mod dependency;
 pub mod event;
 pub mod idents;

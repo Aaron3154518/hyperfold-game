@@ -13,17 +13,17 @@ use resolve::ast_resolve;
 use util::SplitCollect;
 
 use crate::{
-    decode::decoder::Decoder,
+    codegen::codegen::Decoder,
     resolve::{ast_items::ItemsCrate, ast_paths::Paths},
     util::{end, format_code, JoinMapInto},
     validate::ast_validate::ItemData,
 };
 
-mod decode;
-mod parse;
-mod resolve;
-mod util;
-mod validate;
+pub mod codegen;
+pub mod parse;
+pub mod resolve;
+pub mod util;
+pub mod validate;
 
 // Process:
 // 1) Parse - for each crate: traverse AST, extract important items/uses/mods/dependencies
@@ -71,7 +71,7 @@ fn test_resolves(crates: &Vec<Crate>) {
     }
 }
 
-fn main() {
+fn test() {
     let (crates, paths) = Crate::parse(PathBuf::from("test/a"));
     println!(
         "{:#?}",

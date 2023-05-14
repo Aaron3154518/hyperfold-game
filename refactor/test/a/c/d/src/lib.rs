@@ -1,3 +1,7 @@
+use engine::game_crate;
+
+game_crate!();
+
 #[engine::global]
 pub struct DC;
 
