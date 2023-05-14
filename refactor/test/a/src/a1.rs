@@ -2,8 +2,10 @@ pub struct A;
 struct B;
 
 #[engine::event]
-enum Event {
-    A,
-    B(u32),
-    C { name: String },
+struct X;
+#[engine::event]
+struct Y(u32);
+#[engine::event]
+struct Z {
+    name: String,
 }

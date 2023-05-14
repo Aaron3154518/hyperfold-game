@@ -51,10 +51,11 @@ impl Decoder {
             .catch(format!("Invalid crate index: {}", cr_idx))
     }
 
-    fn get_components(&self, cr_idx: usize, cr_alias: String, data_ty: Data) -> Vec<Component> {
+    fn get_structs(&self, cr_idx: usize, cr_alias: String, data_ty: Data) -> Vec<Component> {
         let var_fn = match data_ty {
             Data::Components => component_var,
             Data::Globals => global_var,
+            Data::Events => event_var,
             _ => panic!("Expected components or globals data, found: {:#?}", data_ty),
         };
         match self.get_crate_data(data_ty, cr_idx).as_str() {
@@ -66,30 +67,6 @@ impl Decoder {
                     ty: syn::parse_str(format!("{}::{}", cr_alias, c).as_str())
                         .catch(format!("Could not parse type: {}", c)),
                     var: format_ident!("{}", var_fn(cr_idx, i)),
-                })
-                .collect(),
-        }
-    }
-
-    fn get_events(&self, cr_idx: usize, cr_alias: String) -> Vec<Event> {
-        let event_regex = Regex::new(r"(?P<type>\w+(::\w+)*)\((?P<varis>(\w+(,\w+)*)?)\)")
-            .expect("Could not parse event regex");
-        match self.get_crate_data(Data::Events, cr_idx).as_str() {
-            "" => Vec::new(),
-            data => event_regex
-                .captures_iter(data)
-                .map(|c| {
-                    c.name("type")
-                        .zip(c.name("varis"))
-                        .map(|(ty, varis)| Event {
-                            ty: syn::parse_str(format!("{}::{}", cr_alias, ty.as_str()).as_str())
-                                .catch(format!("Could not parse type: {}", ty.as_str())),
-                            variants: match varis.as_str() {
-                                "" => vec![],
-                                varis => varis.split(",").map(|s| format_ident!("{}", s)).collect(),
-                            },
-                        })
-                        .catch(format!("Could not parse event: {}", data))
                 })
                 .collect(),
         }
@@ -189,7 +166,7 @@ impl Decoder {
         let add_comp = Idents::AddComponent.to_ident();
         let add_comp_tr = &engine_paths[EngineTraits::AddComponent as usize];
         let mut comp_trs = self
-            .get_components(cr_idx, "crate".to_string(), Data::Components)
+            .get_structs(cr_idx, "crate".to_string(), Data::Components)
             .into_iter()
             .map(|c| {
                 let c_ty = c.ty;
@@ -210,7 +187,7 @@ impl Decoder {
         let add_event = Idents::AddEvent.to_ident();
         let add_event_tr = &engine_paths[EngineTraits::AddEvent as usize];
         let mut event_trs = self
-            .get_events(cr_idx, "crate".to_string())
+            .get_structs(cr_idx, "crate".to_string(), Data::Events)
             .into_iter()
             .map(|e| {
                 let e_ty = e.ty;
@@ -244,25 +221,26 @@ impl Decoder {
         let crate_paths_post = deps_lrn.map_vec(|i| &crate_paths[*i]);
 
         // Get all globals and components
-        let [(c_vars, c_tys), (g_vars, g_tys)] = [Data::Components, Data::Globals].map(|data_ty| {
-            crate_paths.iter().enumerate().fold(
-                (Vec::new(), Vec::new()),
-                |(mut vars, mut tys), (cr_idx, cr_path)| {
-                    self.get_components(cr_idx, String::new(), data_ty)
-                        .into_iter()
-                        .map(|c| {
-                            let c_ty = c.ty;
-                            (c.var, quote!(#cr_path #c_ty))
-                        })
-                        .unzip()
-                        .split_into(|mut vs, mut ts| {
-                            vars.append(&mut vs);
-                            tys.append(&mut ts);
-                        });
-                    (vars, tys)
-                },
-            )
-        });
+        let [(c_vars, c_tys), (g_vars, g_tys), (e_vars, e_tys)] =
+            [Data::Components, Data::Globals, Data::Events].map(|data_ty| {
+                crate_paths.iter().enumerate().fold(
+                    (Vec::new(), Vec::new()),
+                    |(mut vars, mut tys), (cr_idx, cr_path)| {
+                        self.get_structs(cr_idx, String::new(), data_ty)
+                            .into_iter()
+                            .map(|c| {
+                                let c_ty = c.ty;
+                                (c.var, quote!(#cr_path #c_ty))
+                            })
+                            .unzip()
+                            .split_into(|mut vs, mut ts| {
+                                vars.append(&mut vs);
+                                tys.append(&mut ts);
+                            });
+                        (vars, tys)
+                    },
+                )
+            });
 
         // Global manager
         let gfoo_ident = Idents::GFoo.to_ident();
@@ -343,23 +321,6 @@ impl Decoder {
         // Event manager
         let add_event = Idents::AddEvent.to_ident();
         let add_event_tr = &engine_trait_paths[EngineTraits::AddEvent as usize];
-        let (e_vars, e_tys) = crate_paths.iter().enumerate().fold(
-            (Vec::new(), Vec::new()),
-            |(mut vars, mut tys), (cr_idx, cr_path)| {
-                for (e_i, e) in self
-                    .get_events(cr_idx, String::new())
-                    .into_iter()
-                    .enumerate()
-                {
-                    let e_ty = e.ty;
-                    for (v_i, v) in e.variants.iter().enumerate() {
-                        vars.push(format_ident!("{}", event_var(cr_idx, e_i, v_i)));
-                        tys.push(quote!(#cr_path #e_ty::#v));
-                    }
-                }
-                (vars, tys)
-            },
-        );
         let e_ident = Idents::E.to_ident();
         let e_len_ident = Idents::ELen.to_ident();
         let e_len = e_vars.len();
@@ -489,7 +450,7 @@ impl Decoder {
                         services: crate::ecs::shared::array_creator::ArrayCreator::create(|_| Vec::new())
                     };
                     s.init();
-                    sevents
+                    s
                 }
 
                 // Init

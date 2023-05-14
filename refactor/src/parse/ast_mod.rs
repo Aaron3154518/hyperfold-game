@@ -13,7 +13,6 @@ use super::ast_fn_arg::FnArg;
 pub enum MarkType {
     Struct,
     Fn { args: Vec<FnArg> },
-    Enum { variants: Vec<String> },
 }
 
 // TODO: Cfg features
@@ -141,7 +140,6 @@ impl Mod {
             syn::Item::Mod(i) => self.visit_item_mod(i),
             syn::Item::Use(i) => self.visit_item_use(i),
             syn::Item::Fn(i) => self.visit_item_fn(i),
-            syn::Item::Enum(i) => self.visit_item_enum(i),
             syn::Item::Struct(i) => self.visit_item_struct(i),
             _ => (),
         }
@@ -206,21 +204,6 @@ impl Mod {
                             .collect(),
                     },
                     sym: Symbol::from(self.path.to_vec(), &i.sig.ident, &i.vis),
-                    attrs,
-                });
-            }
-        }
-    }
-
-    // Events
-    fn visit_item_enum(&mut self, i: &syn::ItemEnum) {
-        if let Some(attrs) = get_attributes_if_active(&i.attrs, &self.path, &Vec::new()) {
-            if !attrs.is_empty() {
-                self.marked.push(MarkedItem {
-                    ty: MarkType::Enum {
-                        variants: i.variants.iter().map(|v| v.ident.to_string()).collect(),
-                    },
-                    sym: Symbol::from(self.path.to_vec(), &i.ident, &i.vis),
                     attrs,
                 });
             }

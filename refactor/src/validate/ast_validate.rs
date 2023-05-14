@@ -4,10 +4,11 @@ use std::{
     io::Write,
 };
 
+use shared::parse_args::{ComponentMacroArgs, GlobalMacroArgs};
+
 use crate::{
     parse::ast_fn_arg::{FnArg, FnArgType},
     resolve::{
-        ast_args::{ComponentMacroArgs, GlobalMacroArgs},
         ast_items::{Component, Dependency, Event, Global, ItemsCrate, System},
         ast_paths::{EngineGlobals, EngineTraits, ExpandEnum, Paths},
         ast_resolve::Path,
@@ -69,12 +70,9 @@ impl ItemData {
                 Data::Globals => items
                     .globals
                     .map_vec(|v| v.join_map(|g| g.path.path[1..].join("::"), ",")),
-                Data::Events => items.events.map_vec(|v| {
-                    v.join_map(
-                        |e| format!("{}({})", e.path.path[1..].join("::"), e.variants.join(",")),
-                        ",",
-                    )
-                }),
+                Data::Events => items
+                    .events
+                    .map_vec(|v| v.join_map(|e| e.path.path[1..].join("::"), ",")),
                 Data::Systems => crates.map_vec(|cr| {
                     cr.systems
                         .join_map(|s| s.validate_to_data(paths, crates, &items), ",")

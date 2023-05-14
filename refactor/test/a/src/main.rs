@@ -12,9 +12,12 @@ union T5 {
 pub struct T6;
 pub fn T7() {}
 // TODO: try toggling pub
-// TODO: events
-#[engine::event]
-pub enum T8 {}
+pub mod T8 {
+    #[engine::event]
+    pub struct X;
+    #[engine::event]
+    pub struct Y(u8);
+}
 
 mod a1;
 pub mod a2;
@@ -27,9 +30,19 @@ use engine::{Container, Label, NorLabels};
 pub trait EFoo {}
 
 #[engine::system]
-fn foo(
-    // _e: &crate::T8,
+fn comp(
+    _e: &crate::T8::X,
     t6: &T6,
+    dc: &c::e::DC,
+    sc: Label<T6>,
+    re: NorLabels<(a2::a3::A::A, a2::a3::A::A)>,
+    t: &dyn EFoo,
+) {
+}
+
+#[engine::system]
+fn vec(
+    _e: &crate::T8::Y,
     dc: &c::e::DC,
     sc: Label<T6>,
     re: NorLabels<(a2::a3::A::A, a2::a3::A::A)>,
@@ -38,8 +51,9 @@ fn foo(
 ) {
 }
 
-fn main() {
-    c::e::bar();
+#[engine::system(Init)]
+fn init(t: &dyn EFoo) {}
 
+fn main() {
     println!("Hello, world!");
 }

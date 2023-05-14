@@ -1,18 +1,17 @@
 #[engine2::system]
-fn sys() {}
+fn sys(_ev: &L::O::L::Lol) {}
 
 #[engine2::component]
 struct S;
 
-#[engine2::event]
-enum Ev {}
-
 pub mod L {
     pub mod O {
-        #[engine2::event]
-        enum L {
-            Lol,
-            Cat,
+        pub mod L {
+            #[engine2::event]
+            pub struct Lol;
+
+            #[engine2::event]
+            struct Cat;
         }
     }
 }

@@ -1,7 +1,10 @@
+use std::collections::HashSet;
+
+use shared::parse_args::{ComponentMacroArgs, GlobalMacroArgs, SystemMacroArgs};
+
 use crate::{
     parse::ast_fn_arg::{FnArg, FnArgType},
     resolve::{
-        ast_args::{ComponentMacroArgs, GlobalMacroArgs},
         ast_items::{ItemsCrate, System},
         ast_paths::{EngineContainers, EngineGlobals, Paths},
         ast_resolve::Path,
@@ -14,6 +17,86 @@ use super::{
     ast_item_list::ItemList,
     constants::{global_var, EID},
 };
+
+pub struct SystemValidate {
+    pub errs: Vec<String>,
+    components: HashSet<(usize, usize)>,
+    globals: HashSet<(usize, usize)>,
+    has_event: bool,
+    has_eid: bool,
+    has_labels: bool,
+    has_vec: bool,
+}
+
+impl SystemValidate {
+    pub fn new() -> Self {
+        Self {
+            errs: Vec::new(),
+            components: HashSet::new(),
+            globals: HashSet::new(),
+            has_event: false,
+            has_eid: false,
+            has_labels: false,
+            has_vec: false,
+        }
+    }
+
+    pub fn validate(&mut self, attr_args: &SystemMacroArgs) {
+        if self.has_eid && self.components.is_empty() {
+            self.errs
+                .push("Cannot take entity ID without any entity components".to_string());
+        }
+        if self.has_vec && (!self.components.is_empty() || self.has_eid) {
+            self.errs
+                .push("Cannot wrap components in a vector and take them individually".to_string());
+        }
+        if attr_args.is_init
+            && (self.has_eid
+                || !self.components.is_empty()
+                || self.has_labels
+                || self.has_vec
+                || self.has_event)
+        {
+            self.errs
+                .push("Init systems may only take Globals".to_string());
+        }
+        if !attr_args.is_init && !self.has_event {
+            self.errs
+                .push("Non-init systems must specify and event".to_string())
+        }
+    }
+
+    pub fn add_eid(&mut self) {
+        self.has_eid = true;
+    }
+
+    pub fn add_component(&mut self, arg: &FnArg, idxs: (usize, usize)) {
+        if !self.components.insert(idxs) {
+            self.errs.push(format!("Duplicate component: {arg}"));
+        }
+    }
+
+    pub fn add_global(&mut self, arg: &FnArg, idxs: (usize, usize)) {
+        if !self.globals.insert(idxs) {
+            self.errs.push(format!("Duplicate global: {arg}"));
+        }
+    }
+
+    pub fn add_event(&mut self, arg: &FnArg) {
+        if self.has_event {
+            self.errs.push(format!("Multiple events specified: {arg}"));
+        }
+        self.has_event = true;
+    }
+
+    pub fn add_container(&mut self, arg: &FnArg) {
+        if self.has_vec {
+            self.errs
+                .push(format!("Multiple containers specified: {arg}"))
+        }
+        self.has_vec = true;
+    }
+}
 
 impl FnArg {
     // Convert to data
@@ -56,23 +139,12 @@ impl FnArg {
         }
     }
 
-    fn to_event(&self, items: &ItemList) -> Option<(usize, usize, usize)> {
+    fn to_event(&self, items: &ItemList) -> Option<(usize, usize)> {
         match &self.ty {
             FnArgType::Path(p) => items.events[p.cr_idx]
                 .iter()
                 .enumerate()
-                .find_map(|(i, e)| {
-                    let mut e_path = p.to_owned();
-                    e_path.path.pop();
-                    (e.path == e_path)
-                        .then(|| i)
-                        .zip(
-                            e.variants
-                                .iter()
-                                .position(|v| v == p.path.last().expect("Empty argument path")),
-                        )
-                        .map(|(e_i, v_i)| (p.cr_idx, e_i, v_i))
-                }),
+                .find_map(|(i, e)| (&e.path == p).then_some((p.cr_idx, i))),
             _ => None,
         }
     }
@@ -137,60 +209,65 @@ impl FnArg {
         &self,
         paths: &Paths,
         items: &ItemList,
-        errs: &mut Vec<String>,
+        validate: &mut SystemValidate,
     ) -> String {
         match self
             // Entity ID
             .to_eid(paths)
             .map(|_| {
-                self.validate_ref(1, errs);
-                self.validate_mut(false, errs);
+                self.validate_ref(1, &mut validate.errs);
+                self.validate_mut(false, &mut validate.errs);
+                validate.add_eid();
                 EID.to_string()
             })
             // Component
             .or_else(|| {
                 self.to_component(items).map(|(cr_i, c_i, _)| {
-                    self.validate_ref(1, errs);
+                    self.validate_ref(1, &mut validate.errs);
+                    validate.add_component(self, (cr_i, c_i));
                     component_var(cr_i, c_i)
                 })
             })
             // Global
             .or_else(|| {
                 self.to_global(items).map(|(cr_i, g_i, g_args)| {
-                    self.validate_ref(1, errs);
+                    self.validate_ref(1, &mut validate.errs);
                     if g_args.is_const {
-                        self.validate_mut(false, errs);
+                        self.validate_mut(false, &mut validate.errs);
                     }
+                    validate.add_global(self, (cr_i, g_i));
                     global_var(cr_i, g_i)
                 })
             })
             // Event
             .or_else(|| {
-                self.to_event(items).map(|(cr_i, e_i, v_i)| {
-                    self.validate_ref(1, errs);
-                    self.validate_mut(false, errs);
-                    event_var(cr_i, e_i, v_i)
+                self.to_event(items).map(|(cr_i, e_i)| {
+                    self.validate_ref(1, &mut validate.errs);
+                    self.validate_mut(false, &mut validate.errs);
+                    validate.add_event(self);
+                    event_var(cr_i, e_i)
                 })
             })
             // Trait
             .or_else(|| {
                 // This assumes the traits are all at the beginning of the globals list
                 self.to_trait(items).map(|(cr_i, g_i)| {
-                    self.validate_ref(1, errs);
+                    self.validate_ref(1, &mut validate.errs);
+                    validate.add_global(self, (cr_i, g_i));
                     global_var(cr_i, g_i)
                 })
             })
             // Label
             .or_else(|| {
                 self.to_label(paths).map(|(l_ty, args)| {
-                    self.validate_ref(0, errs);
+                    self.validate_ref(0, &mut validate.errs);
                     format!(
                         "l{}{}",
                         l_ty,
                         args.join_map(
                             |a| a.to_component(items).map_or_else(
                                 || {
-                                    errs.push(format!(
+                                    &mut validate.errs.push(format!(
                                         "Label expects Component type, found: {}",
                                         a
                                     ));
@@ -206,19 +283,20 @@ impl FnArg {
             // Container
             .or_else(|| {
                 self.to_container(paths).map(|args| {
-                    self.validate_ref(0, errs);
+                    self.validate_ref(0, &mut validate.errs);
+                    validate.add_container(self);
                     format!(
                         "v{}",
                         args.join_map(
                             |a| a
                                 .to_eid(paths)
                                 .map(|_| {
-                                    a.validate_ref(1, errs);
-                                    a.validate_mut(false, errs);
+                                    a.validate_ref(1, &mut validate.errs);
+                                    a.validate_mut(false, &mut validate.errs);
                                     EID.to_string()
                                 })
                                 .or_else(|| a.to_component(items).map(|(cr_i, c_i, _)| {
-                                    a.validate_ref(1, errs);
+                                    a.validate_ref(1, &mut validate.errs);
                                     format!(
                                         "{}{}",
                                         if a.mutable { "m" } else { "" },
@@ -227,7 +305,7 @@ impl FnArg {
                                 }))
                                 .map_or_else(
                                     || {
-                                        errs.push(format!(
+                                        &mut validate.errs.push(format!(
                                         "Container expects Component or Entity ID type, found: {}",
                                         a
                                     ));
@@ -242,7 +320,9 @@ impl FnArg {
             }) {
             Some(data) => data,
             None => {
-                errs.push(format!("Argument: \"{}\" is not a known type", self));
+                validate
+                    .errs
+                    .push(format!("Argument: \"{}\" is not a known type", self));
                 String::new()
             }
         }
@@ -250,25 +330,26 @@ impl FnArg {
 }
 
 impl System {
-    // TODO: cross argument validations
     pub fn validate_to_data(
         &self,
         paths: &Paths,
         crates: &Vec<ItemsCrate>,
         items: &ItemList,
     ) -> String {
-        let mut errs = Vec::new();
+        let mut validate = SystemValidate::new();
         let data = format!(
-            "{}({})",
+            "{}({}){}",
             self.path.path[1..].join("::"),
             self.args
-                .join_map(|a| a.validate_to_data(paths, items, &mut errs), ":")
+                .join_map(|a| a.validate_to_data(paths, items, &mut validate), ":"),
+            if self.attr_args.is_init { "i" } else { "" }
         );
-        if !errs.is_empty() {
+        validate.validate(&self.attr_args);
+        if !validate.errs.is_empty() {
             panic!(
                 "\n\nIn system: \"{}()\"\n{}\n\n",
                 self.path.path.join("::"),
-                errs.join("\n")
+                validate.errs.join("\n")
             )
         }
         data

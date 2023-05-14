@@ -76,21 +76,27 @@ impl SystemRegexes {
         let id = r"id";
         let c = r"c\d+_\d+";
         let g = r"g\d+_\d+";
-        let e = r"e\d+_\d+_\d+";
+        let e = r"e\d+_\d+";
         let l = format!(r"l(!)?[\|&]{c}(-{c})*");
         let v_c = format!(r"(m)?{c}");
         let v_i = format!(r"{v_c}|{id}");
         let v = format!(r"v({v_i})(-({v_i}))*");
         let arg = format!(r"{id}|{c}|{g}|{e}|{l}|{v}");
 
-        let [id, component, global, event, label, vec_comp, vector] = [id, c, g, e, &l, &v_c, &v]
-            .map(|r_str| {
-                Regex::new(format!(r"^{r_str}$").as_str())
-                    .catch(format!("Could not create regex: \"^{r_str}$\""))
-            });
-        let system =
-            Regex::new(format!(r"(?P<name>\w+)\((?P<args>(({arg})(:({arg}))*)?)\)").as_str())
-                .expect("Could not create system regex");
+        let [id, component, global, event, label, vec_comp, vector, system] = [
+            id,
+            c,
+            g,
+            e,
+            &l,
+            &v_c,
+            &v,
+            &format!(r"(?P<name>\w+)\((?P<args>(({arg})(:({arg}))*)?)\)(?P<init>(i)?)"),
+        ]
+        .map(|r_str| {
+            Regex::new(format!(r"^{r_str}$").as_str())
+                .catch(format!("Could not create regex: \"^{r_str}$\""))
+        });
 
         Self {
             id,
@@ -104,11 +110,17 @@ impl SystemRegexes {
         }
     }
 
-    pub fn parse_data(&self, sys_str: &str) -> Option<(String, String)> {
+    pub fn parse_data(&self, sys_str: &str) -> Option<(String, String, bool)> {
         self.system
             .captures(sys_str)
-            .and_then(|c| c.name("name").zip(c.name("args")))
-            .map(|(name, args)| (name.as_str().to_string(), args.as_str().to_string()))
+            .and_then(|c| c.name("name").zip(c.name("args")).zip(c.name("init")))
+            .map(|((name, args), init)| {
+                (
+                    name.as_str().to_string(),
+                    args.as_str().to_string(),
+                    init.as_str() == "i",
+                )
+            })
     }
 
     pub fn parse_arg(&self, arg_str: &str) -> Option<FnArg> {
@@ -200,7 +212,7 @@ pub struct System {
 
 impl System {
     pub fn parse(cr_path: &syn::Path, data: &str, regexes: &SystemRegexes) -> Self {
-        let (name, args) = regexes
+        let (name, args, is_init) = regexes
             .parse_data(data)
             .catch(format!("Could not parse system: {data}"));
         let name = format_ident!("{name}");
@@ -215,8 +227,8 @@ impl System {
             v_types: Vec::new(),
             g_args: Vec::new(),
             event: quote!(),
-            is_vec: true,
-            is_init: false,
+            is_vec: false,
+            is_init,
         };
 
         let gfoo = Idents::GFoo.to_ident();
@@ -470,11 +482,11 @@ impl System {
             [Idents::GenCFoo, Idents::GenGFoo, Idents::GenEFoo].map(|i| i.to_ident());
 
         if self.is_init {
-            quote!((
+            quote!(
                 (|#cfoo: &mut #cfoo, #gfoo: &mut #gfoo, #efoo: &mut #efoo| {
                       #body
                 })(&mut self.cm, &mut self.gm, &mut self.events);
-            ))
+            )
         } else {
             let [e_ident, e] = [Idents::E, Idents::GenE].map(|i| i.to_ident());
             let event = &self.event;

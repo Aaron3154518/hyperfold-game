@@ -4,14 +4,15 @@ use crate::{
     parse::{
         ast_crate::Crate,
         ast_fn_arg::{FnArg, FnArgType},
-        ast_mod::Mod,
+        ast_mod::{MarkType, Mod},
     },
     resolve::ast_resolve::resolve_path,
     util::{Catch, Get},
 };
 
+use shared::parse_args::{ComponentMacroArgs, GlobalMacroArgs, SystemMacroArgs};
+
 use super::{
-    ast_args::{ComponentMacroArgs, GlobalMacroArgs},
     ast_paths::{MacroPaths, Paths},
     ast_resolve::Path,
 };
@@ -31,13 +32,13 @@ pub struct Global {
 #[derive(Debug)]
 pub struct Event {
     pub path: Path,
-    pub variants: Vec<String>,
 }
 
 #[derive(Debug)]
 pub struct System {
     pub path: Path,
     pub args: Vec<FnArg>,
+    pub attr_args: SystemMacroArgs,
 }
 
 #[derive(Debug)]
@@ -96,7 +97,7 @@ impl ItemsCrate {
             for (path, args) in mi.attrs.iter() {
                 let match_path = resolve_path(path.to_vec(), cr, m, crates).get();
                 match &mi.ty {
-                    crate::parse::ast_mod::MarkType::Struct => {
+                    MarkType::Struct => {
                         if &match_path == paths.get_macro(MacroPaths::Component) {
                             self.components.push(Component {
                                 path: Path {
@@ -115,16 +116,23 @@ impl ItemsCrate {
                                 args: GlobalMacroArgs::from(args.to_vec()),
                             });
                             break;
+                        } else if &match_path == paths.get_macro(MacroPaths::Event) {
+                            self.events.push(Event {
+                                path: Path {
+                                    cr_idx,
+                                    path: mi.sym.path.to_vec(),
+                                },
+                            })
                         }
                     }
-                    crate::parse::ast_mod::MarkType::Fn { args } => {
+                    MarkType::Fn { args: fn_args } => {
                         if &match_path == paths.get_macro(MacroPaths::System) {
                             self.systems.push(System {
                                 path: Path {
                                     cr_idx,
                                     path: mi.sym.path.to_vec(),
                                 },
-                                args: args
+                                args: fn_args
                                     .iter()
                                     .map(|a| {
                                         let mut a = a.to_owned();
@@ -132,19 +140,9 @@ impl ItemsCrate {
                                         a
                                     })
                                     .collect(),
+                                attr_args: SystemMacroArgs::from(args.to_vec()),
                             });
                             break;
-                        }
-                    }
-                    crate::parse::ast_mod::MarkType::Enum { variants } => {
-                        if &match_path == paths.get_macro(MacroPaths::Event) {
-                            self.events.push(Event {
-                                path: Path {
-                                    cr_idx,
-                                    path: mi.sym.path.to_vec(),
-                                },
-                                variants: variants.to_vec(),
-                            });
                         }
                     }
                 }
