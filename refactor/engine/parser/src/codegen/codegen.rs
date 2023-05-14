@@ -1,4 +1,9 @@
-use std::{array, fs, path::PathBuf};
+use std::{
+    array, fs,
+    iter::{self, Filter},
+    path::PathBuf,
+    str::Split,
+};
 
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
@@ -6,20 +11,22 @@ use regex::Regex;
 use syn::{PathArguments, PathSegment};
 
 use crate::{
-    codegen::dependency::get_deps_post_order,
+    codegen::{dependency::get_deps_post_order, structs::parse_type},
     resolve::ast_paths::{EngineGlobals, EngineTraits, ExpandEnum, GetPaths, NamespaceTraits},
-    util::{Catch, JoinMap, JoinMapInto, SplitCollect, SplitIter},
+    util::{Call, Catch, JoinMap, JoinMapInto, SplitCollect},
     validate::{
         ast_validate::Data,
-        constants::{component_var, event_var, global_var, DATA_FILE, NAMESPACE, SEP},
+        constants::{
+            component_var, event_var, event_variant, global_var, DATA_FILE, NAMESPACE, SEP,
+        },
     },
 };
 
 use super::{
-    component::Component,
     dependency::Dependency,
     event::{self, Event},
     idents::Idents,
+    structs::Struct,
     system::{ContainerArg, FnArg, LabelType, System, SystemRegexes},
 };
 
@@ -51,34 +58,19 @@ impl Decoder {
             .catch(format!("Invalid crate index: {}", cr_idx))
     }
 
-    fn get_structs(&self, cr_idx: usize, cr_alias: String, data_ty: Data) -> Vec<Component> {
-        let var_fn = match data_ty {
-            Data::Components => component_var,
-            Data::Globals => global_var,
-            Data::Events => event_var,
-            _ => panic!("Expected components or globals data, found: {:#?}", data_ty),
-        };
-        match self.get_crate_data(data_ty, cr_idx).as_str() {
-            "" => Vec::new(),
-            data => data
-                .split(",")
-                .enumerate()
-                .map(|(i, c)| Component {
-                    ty: syn::parse_str(format!("{}::{}", cr_alias, c).as_str())
-                        .catch(format!("Could not parse type: {}", c)),
-                    var: format_ident!("{}", var_fn(cr_idx, i)),
-                })
-                .collect(),
-        }
+    fn split_crate_data(&self, data: Data, cr_idx: usize, sep: &str) -> Vec<&str> {
+        self.get_crate_data(data, cr_idx)
+            .as_str()
+            .split(sep)
+            .filter(|s| !s.is_empty())
+            .collect()
     }
 
     fn get_systems(&self, cr_idx: usize, cr_path: &syn::Path) -> Vec<System> {
         let regexes = SystemRegexes::new();
 
-        match self.get_crate_data(Data::Systems, cr_idx).as_str() {
-            "" => Vec::new(),
-            data => data.split_map(",", |s| System::parse(cr_path, s, &regexes)),
-        }
+        self.split_crate_data(Data::Systems, cr_idx, ",")
+            .map_vec(|s| System::parse(cr_path, s, &regexes))
     }
 
     fn get_dependencies(&self, dir: PathBuf) -> Vec<(PathBuf, Vec<Dependency>)> {
@@ -137,7 +129,7 @@ impl Decoder {
                 .catch(format!("Could not parse engine global data: {}", i));
             str.split_once("_")
                 .catch(format!("Could not parse engine global: {}", str))
-                .split_into(|cr_idx, g_i| {
+                .call_into(|(cr_idx, g_i)| {
                     (
                         cr_idx
                             .parse::<usize>()
@@ -163,17 +155,17 @@ impl Decoder {
             .map(|d| format_ident!("{}", d.alias))
             .collect::<Vec<_>>();
 
+        // Get component and event types
+
         // Aggregate AddComponent traits and dependencies
         let add_comp = NamespaceTraits::AddComponent.to_ident();
         let add_comp_tr = &engine_paths[EngineTraits::AddComponent as usize];
         let mut comp_trs = self
-            .get_structs(cr_idx, "crate".to_string(), Data::Components)
-            .into_iter()
-            .map(|c| {
-                let c_ty = c.ty;
-                quote!(#add_comp_tr<#c_ty>)
-            })
-            .collect::<Vec<_>>();
+            .split_crate_data(Data::Components, cr_idx, ",")
+            .map_vec(|path| {
+                let ty = parse_type(path);
+                quote!(#add_comp_tr<crate::#ty>)
+            });
         comp_trs.append(&mut dep_aliases.map_vec(|da| quote!(#da::#ns::#add_comp)));
         let comp_code = match comp_trs.split_first() {
             Some((first, tail)) => {
@@ -188,13 +180,11 @@ impl Decoder {
         let add_event = NamespaceTraits::AddEvent.to_ident();
         let add_event_tr = &engine_paths[EngineTraits::AddEvent as usize];
         let mut event_trs = self
-            .get_structs(cr_idx, "crate".to_string(), Data::Events)
-            .into_iter()
-            .map(|e| {
-                let e_ty = e.ty;
-                quote!(#add_event_tr<#e_ty>)
-            })
-            .collect::<Vec<_>>();
+            .split_crate_data(Data::Events, cr_idx, ",")
+            .map_vec(|path| {
+                let ty = parse_type(path);
+                quote!(#add_event_tr<crate::#ty>)
+            });
         event_trs.append(&mut dep_aliases.map_vec(|da| quote!(#da::#ns::#add_event)));
         let event_code = match event_trs.split_first() {
             Some((first, tail)) => {
@@ -222,26 +212,39 @@ impl Decoder {
         let crate_paths_post = deps_lrn.map_vec(|i| &crate_paths[*i]);
 
         // Get all globals and components
-        let [(c_vars, c_tys), (g_vars, g_tys), (e_vars, e_tys)] =
-            [Data::Components, Data::Globals, Data::Events].map(|data_ty| {
-                crate_paths.iter().enumerate().fold(
-                    (Vec::new(), Vec::new()),
-                    |(mut vars, mut tys), (cr_idx, cr_path)| {
-                        self.get_structs(cr_idx, String::new(), data_ty)
-                            .into_iter()
-                            .map(|c| {
-                                let c_ty = c.ty;
-                                (c.var, quote!(#cr_path #c_ty))
-                            })
-                            .unzip()
-                            .split_into(|mut vs, mut ts| {
-                                vars.append(&mut vs);
-                                tys.append(&mut ts);
-                            });
-                        (vars, tys)
-                    },
-                )
-            });
+        let (mut c_tys, mut c_vars) = (Vec::new(), Vec::new());
+        let (mut g_tys, mut g_vars) = (Vec::new(), Vec::new());
+        let (mut e_tys, mut e_vars, mut e_varis) = (Vec::new(), Vec::new(), Vec::new());
+        for (cr_idx, cr_path) in crate_paths.iter().enumerate() {
+            for (i, path) in self
+                .split_crate_data(Data::Components, cr_idx, ",")
+                .into_iter()
+                .enumerate()
+            {
+                let path = parse_type(path);
+                c_tys.push(quote!(#cr_path::#path));
+                c_vars.push(format_ident!("{}", component_var(cr_idx, i)));
+            }
+            for (i, path) in self
+                .split_crate_data(Data::Globals, cr_idx, ",")
+                .into_iter()
+                .enumerate()
+            {
+                let path = parse_type(path);
+                g_tys.push(quote!(#cr_path::#path));
+                g_vars.push(format_ident!("{}", global_var(cr_idx, i)));
+            }
+            for (i, path) in self
+                .split_crate_data(Data::Events, cr_idx, ",")
+                .into_iter()
+                .enumerate()
+            {
+                let path = parse_type(path);
+                e_tys.push(quote!(#cr_path::#path));
+                e_vars.push(format_ident!("{}", event_var(cr_idx, i)));
+                e_varis.push(format_ident!("{}", event_variant(cr_idx, i)));
+            }
+        }
 
         // Global manager
         let gfoo_ident = Idents::GFoo.to_ident();
@@ -268,9 +271,9 @@ impl Decoder {
         // Paths to engine globals
         let [gp_entity, gp_entity_trash] =
             [EngineGlobals::Entity, EngineGlobals::EntityTrash].map(|eg| {
-                engine_globals[eg as usize].split(|cr_idx, _| {
+                engine_globals[eg as usize].call(|(cr_idx, _)| {
                     let path = &crate_paths[*cr_idx];
-                    let ident = format_ident!("{}", EngineGlobals::Entity.as_ident());
+                    let ident = format_ident!("{}", eg.as_ident());
                     quote!(#path::#ident)
                 })
             });
@@ -293,7 +296,7 @@ impl Decoder {
                     }
                 }
 
-                pub fn append(&mut self, cm: &mut #cfoo_ident) {
+                pub fn append(&mut self, cm: &mut Self) {
                     self.eids.extend(cm.eids.drain());
                     #(self.#c_vars.extend(cm.#c_vars.drain());)*
                 }
@@ -328,7 +331,7 @@ impl Decoder {
         let e_def = quote!(
             #[derive(Hash, Clone, Copy, Eq, PartialEq, Debug)]
             enum #e_ident {
-                #(#e_vars),*
+                #(#e_varis),*
             }
             pub const #e_len_ident: usize = #e_len;
         );
@@ -370,7 +373,7 @@ impl Decoder {
                 pub fn pop(&mut self, e: #e_ident) {
                     match e {
                         #(
-                            #e_ident::#e_vars => {
+                            #e_ident::#e_varis => {
                                 self.#e_vars.pop();
                             }
                         )*
@@ -434,8 +437,8 @@ impl Decoder {
         let sfoo_ident = Idents::SFoo.to_ident();
         let sfoo_def = quote!(
             pub struct #sfoo_ident {
-                #cfoo: #gfoo_ident,
-                #gfoo: #cfoo_ident,
+                #cfoo: #cfoo_ident,
+                #gfoo: #gfoo_ident,
                 #efoo: #efoo_ident,
                 stack: Vec<std::collections::VecDeque<(#e_ident, usize)>>,
                 services: [Vec<Box<dyn Fn(&mut #cfoo_ident, &mut #gfoo_ident, &mut #efoo_ident)>>; #e_len_ident]

@@ -16,7 +16,7 @@ use crate::util::Flatten;
 use crate::util::JoinMap;
 use crate::{
     resolve::ast_paths::ExpandEnum,
-    util::{Catch, SplitCollect, SplitIter},
+    util::{Call, Catch, SplitCollect},
 };
 
 #[shared::macros::expand_enum]
@@ -167,7 +167,7 @@ impl SystemRegexes {
             // Container
             .or_else(|| {
                 self.vector.find(arg_str).map(|_| {
-                    FnArg::Container(arg_str.split_at(1).split_into(|_, args| {
+                    FnArg::Container(arg_str.split_at(1).call_into(|(_, args)| {
                         args.split_map("-", |a| {
                             self.id
                                 .find(a)
@@ -232,6 +232,7 @@ impl System {
         };
 
         let gfoo = Idents::GFoo.to_ident();
+        let e_ident = Idents::GenE.to_ident();
 
         s.args = match args.as_str() {
             "" => Vec::new(),
@@ -249,13 +250,13 @@ impl System {
                             tt
                         }
                         FnArg::Global(g) => {
-                            let tt = quote!(&mut gfoo.#g);
+                            let tt = quote!(&mut #gfoo.#g);
                             s.g_args.push(g);
                             tt
                         }
                         FnArg::Event(e) => {
-                            s.event = quote!(e);
-                            quote!(e)
+                            s.event = quote!(#e);
+                            quote!(#e_ident)
                         }
                         FnArg::Label(ty, args) => {
                             match ty {
@@ -485,7 +486,7 @@ impl System {
             quote!(
                 (|#cfoo: &mut #cfoo, #gfoo: &mut #gfoo, #efoo: &mut #efoo| {
                       #body
-                })(&mut self.cm, &mut self.gm, &mut self.events);
+                })(&mut self.#cfoo, &mut self.#gfoo, &mut self.#efoo);
             )
         } else {
             let [e_ident, e] = [Idents::E, Idents::GenE].map(|i| i.to_ident());

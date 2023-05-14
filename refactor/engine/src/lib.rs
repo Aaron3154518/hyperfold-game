@@ -7,17 +7,59 @@ game_crate!();
 
 // Important globals
 #[global]
+#[derive(PartialEq, Eq, Hash)]
 pub struct Entity;
+
+impl Entity {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
 #[global]
-pub struct EntityTrash;
+pub struct EntityTrash(Vec<Entity>);
+
+impl EntityTrash {
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+}
+
 #[global]
 pub struct Event;
+
+impl Event {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
 #[global]
 pub struct RenderSystem;
+
+impl RenderSystem {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
 #[macros::global]
 pub struct Screen;
+
+impl Screen {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
 #[macros::global]
 pub struct Camera;
+
+impl Camera {
+    pub fn new() -> Self {
+        Self
+    }
+}
 
 pub type Container<T> = Vec<T>;
 pub type Label<T> = PhantomData<T>;

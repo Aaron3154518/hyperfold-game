@@ -58,12 +58,8 @@ pub fn game_crate(_input: TokenStream) -> TokenStream {
         env::var("CARGO_MANIFEST_DIR").expect("No manifest directory specified"),
     ));
 
-    let mut f = Out::new("out2.txt", true);
-    f.write(format!(
-        "{}:\n{}\n",
-        env::var("CARGO_MANIFEST_DIR").expect("No manifest directory specified"),
-        format_code(code.to_string())
-    ));
+    let mut f = Out::new("out2.rs", false);
+    f.write(format!("{}\n", format_code(code.to_string())));
 
     code.into()
 }

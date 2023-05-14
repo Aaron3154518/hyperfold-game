@@ -123,17 +123,33 @@ impl<T> JoinMapInto<T> for alloc::vec::IntoIter<T> {
     }
 }
 
-impl<'a, T, Iter: Iterator<Item = &'a T>> JoinMapInto<(usize, &'a T)> for Enumerate<Iter> {
+impl<T, Iter: Iterator<Item = T>> JoinMapInto<(usize, T)> for Enumerate<Iter> {
     fn map_vec<U, F>(self, f: F) -> Vec<U>
     where
-        F: FnMut((usize, &'a T)) -> U,
+        F: FnMut((usize, T)) -> U,
     {
         self.map(f).collect()
     }
 
     fn join_map<F>(self, f: F, sep: &str) -> String
     where
-        F: FnMut((usize, &'a T)) -> String,
+        F: FnMut((usize, T)) -> String,
+    {
+        self.map_vec(f).join(sep)
+    }
+}
+
+impl<'a> JoinMapInto<&'a str> for std::str::Split<'a, &str> {
+    fn map_vec<U, F>(self, f: F) -> Vec<U>
+    where
+        F: FnMut(&'a str) -> U,
+    {
+        self.map(f).collect()
+    }
+
+    fn join_map<F>(self, f: F, sep: &str) -> String
+    where
+        F: FnMut(&'a str) -> String,
     {
         self.map_vec(f).join(sep)
     }
@@ -158,20 +174,21 @@ impl<T> NoneOr<T> for Option<T> {
     }
 }
 
-// Trait for spliting tuples
-pub trait SplitIter<T, U, V> {
-    fn split(&self, f: impl FnOnce(&T, &U) -> V) -> V;
+// Trait for appling a function to a type as a member function
+// Used for splitting tuples
+pub trait Call<T, V> {
+    fn call(&self, f: impl FnOnce(&T) -> V) -> V;
 
-    fn split_into(self, f: impl FnOnce(T, U) -> V) -> V;
+    fn call_into(self, f: impl FnOnce(T) -> V) -> V;
 }
 
-impl<T, U, V> SplitIter<T, U, V> for (T, U) {
-    fn split(&self, f: impl FnOnce(&T, &U) -> V) -> V {
-        f(&self.0, &self.1)
+impl<T, V> Call<Self, V> for T {
+    fn call(&self, f: impl FnOnce(&Self) -> V) -> V {
+        f(&self)
     }
 
-    fn split_into(self, f: impl FnOnce(T, U) -> V) -> V {
-        f(self.0, self.1)
+    fn call_into(self, f: impl FnOnce(Self) -> V) -> V {
+        f(self)
     }
 }
 

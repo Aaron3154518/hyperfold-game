@@ -13,7 +13,7 @@ use crate::{
         ast_paths::{EngineGlobals, EngineTraits, ExpandEnum, Paths},
         ast_resolve::Path,
     },
-    util::{end, Catch, JoinMap, JoinMapInto, NoneOr, SplitIter},
+    util::{end, Call, Catch, JoinMap, JoinMapInto, NoneOr},
 };
 
 use super::{

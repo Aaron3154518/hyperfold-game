@@ -13,7 +13,7 @@ use super::{
 use crate::{
     codegen::mods::{dependency_namespace_mod, entry_namespace_mod},
     resolve::ast_paths::Paths,
-    util::{end, Catch, SplitIter},
+    util::{end, Call, Catch},
 };
 
 // TODO: hardcoded
@@ -117,8 +117,8 @@ impl Crate {
         let mut i = 0;
         while i < crates.len() {
             let cr_dir = crates[i].dir.to_owned();
-            Self::get_crate_dependencies(cr_dir.to_owned(), &block_dirs, &crates).split_into(
-                |deps, new_deps| {
+            Self::get_crate_dependencies(cr_dir.to_owned(), &block_dirs, &crates).call_into(
+                |(deps, new_deps)| {
                     crate_deps.push(deps);
                     for path in new_deps {
                         crates.push(Crate::new(cr_dir.join(path), crates.len(), false))

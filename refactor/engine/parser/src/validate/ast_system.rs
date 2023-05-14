@@ -15,7 +15,7 @@ use crate::{
 
 use super::{
     ast_item_list::ItemList,
-    constants::{global_var, EID},
+    constants::{event_variant, global_var, EID},
 };
 
 pub struct SystemValidate {
@@ -244,7 +244,7 @@ impl FnArg {
                     self.validate_ref(1, &mut validate.errs);
                     self.validate_mut(false, &mut validate.errs);
                     validate.add_event(self);
-                    event_var(cr_i, e_i)
+                    event_variant(cr_i, e_i)
                 })
             })
             // Trait

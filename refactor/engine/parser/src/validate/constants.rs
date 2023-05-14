@@ -14,3 +14,7 @@ pub fn global_var(cr_idx: usize, g_idx: usize) -> String {
 pub fn event_var(cr_idx: usize, e_idx: usize) -> String {
     format!("e{}_{}", cr_idx, e_idx)
 }
+
+pub fn event_variant(cr_idx: usize, e_idx: usize) -> String {
+    format!("E{}_{}", cr_idx, e_idx)
+}
