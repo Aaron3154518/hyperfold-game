@@ -11,8 +11,10 @@ use regex::Regex;
 use syn::{PathArguments, PathSegment};
 
 use crate::{
-    codegen::{dependency::get_deps_post_order, structs::parse_type},
-    resolve::ast_paths::{EngineGlobals, EngineTraits, ExpandEnum, GetPaths, NamespaceTraits},
+    codegen::{dependency::get_deps_post_order, structs::parse_type, util::vec_to_path},
+    resolve::ast_paths::{
+        EngineGlobals, EngineIdents, EngineTraits, ExpandEnum, GetPaths, NamespaceTraits,
+    },
     util::{Call, Catch, JoinMap, JoinMapInto, SplitCollect},
     validate::{
         ast_validate::Data,
@@ -321,7 +323,7 @@ impl Decoder {
             #(
                 impl #add_comp_tr<#c_tys> for #cfoo_ident {
                     fn add_component(&mut self, e: #gp_entity, t: #c_tys) {
-                        self.#c_vars.insert(e, t)
+                        self.#c_vars.insert(e, t);
                     }
                 }
             )*
@@ -345,7 +347,6 @@ impl Decoder {
         );
         let efoo_ident = EngineGlobals::EFoo.to_ident();
         let efoo_def = quote!(
-            #[derive(Debug)]
             pub struct #efoo_ident {
                 #(#e_vars: Vec<#e_tys>),*,
                 events: std::collections::VecDeque<(#e_ident, usize)>
@@ -418,7 +419,7 @@ impl Decoder {
         let g_efoo = &engine_globals[EngineGlobals::EFoo as usize];
         let g_cfoo = &engine_globals[EngineGlobals::CFoo as usize];
 
-        let engine_cr_idx = self.get_engine_crate_index();
+        let engine_cr_path = &crate_paths[self.get_engine_crate_index()];
 
         // Systems
         let systems =
@@ -432,16 +433,22 @@ impl Decoder {
         let init_systems_code = systems
             .iter()
             .filter(|s| s.is_init)
-            .map(|s| s.to_quote(&crate_paths[engine_cr_idx]))
+            .map(|s| s.to_quote(engine_cr_path))
             .collect::<Vec<_>>();
         let systems_code = systems
             .iter()
             .filter(|s| !s.is_init)
-            .map(|s| s.to_quote(&crate_paths[engine_cr_idx]))
+            .map(|s| s.to_quote(engine_cr_path))
             .collect::<Vec<_>>();
 
         let [cfoo, gfoo, efoo] =
             [Idents::GenCFoo, Idents::GenGFoo, Idents::GenEFoo].map(|i| i.to_ident());
+        let init_events = [
+            EngineIdents::CoreUpdate,
+            EngineIdents::CoreEvents,
+            EngineIdents::CoreRender,
+        ]
+        .map(|i| vec_to_path(i.path_stem()));
 
         // Systems manager
         let sfoo_ident = Idents::SFoo.to_ident();
@@ -461,7 +468,7 @@ impl Decoder {
                         #gfoo: #gfoo_ident::new(),
                         #efoo: #efoo_ident::new(),
                         stack: Vec::new(),
-                        services: crate::ecs::shared::array_creator::ArrayCreator::create(|_| Vec::new())
+                        services: std::array::from_fn(|_| Vec::new())
                     };
                     s.init();
                     s
@@ -571,9 +578,7 @@ impl Decoder {
 
                 fn init_events(&self, ts: u32) -> #efoo_ident {
                     let mut #efoo = #efoo_ident::new();
-                    #efoo.new_event(CoreEvent::Events);
-                    #efoo.new_event(CoreEvent::Update(ts));
-                    #efoo.new_event(CoreEvent::Render);
+                    #(#add_event_tr::new_event(&mut #efoo, #engine_cr_path::#init_events);)*
                     #efoo
                 }
 

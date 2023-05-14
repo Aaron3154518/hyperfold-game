@@ -27,11 +27,11 @@ use super::{
 pub enum Data {
     Components,
     Globals,
+    EngineGlobals,
+    EngineTraits,
     Events,
     Systems,
     Dependencies,
-    EngineTraits,
-    EngineGlobals,
     CratePaths,
     EngineCrateIdx,
 }

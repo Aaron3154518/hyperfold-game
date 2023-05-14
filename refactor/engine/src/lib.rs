@@ -7,9 +7,19 @@ pub mod intersect;
 
 game_crate!();
 
+// Important events
+pub mod core_events {
+    #[macros::event]
+    pub struct Update(pub u32);
+    #[macros::event]
+    pub struct Events;
+    #[macros::event]
+    pub struct Render;
+}
+
 // Important globals
 #[global]
-#[derive(PartialEq, Eq, Hash)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
 pub struct Entity;
 
 impl Entity {

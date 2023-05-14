@@ -14,6 +14,7 @@ use crate::codegen::util::type_to_type;
 use crate::codegen::util::vec_to_path;
 use crate::resolve::ast_paths::EngineGlobals;
 use crate::resolve::ast_paths::EngineIdents;
+use crate::resolve::ast_paths::EngineTraits;
 use crate::resolve::ast_paths::GetPaths;
 use crate::util::Flatten;
 use crate::util::JoinMap;
@@ -234,8 +235,7 @@ impl System {
             is_init,
         };
 
-        let gfoo = Idents::GFoo.to_ident();
-        let e_ident = Idents::GenE.to_ident();
+        let [gfoo, e_ident] = [Idents::GenGFoo, Idents::GenE].map(|i| i.to_ident());
 
         s.args = match args.as_str() {
             "" => Vec::new(),
@@ -492,10 +492,11 @@ impl System {
         let gfoo_ty = Idents::GFoo.to_ident();
         let [cfoo, gfoo, efoo] =
             [Idents::GenCFoo, Idents::GenGFoo, Idents::GenEFoo].map(|i| i.to_ident());
+        let add_event = EngineTraits::AddEvent.to_ident();
 
         if self.is_init {
             quote!(
-                (|#cfoo: &mut #cfoo, #gfoo: &mut #gfoo, #efoo: &mut #efoo| {
+                (|#cfoo: &mut #cfoo_ty, #gfoo: &mut #gfoo_ty, #efoo: &mut #efoo_ty| {
                       #body
                 })(&mut self.#cfoo, &mut self.#gfoo, &mut self.#efoo);
             )
@@ -504,7 +505,7 @@ impl System {
             let event = &self.event;
             quote!(
                 let f = |#cfoo: &mut #cfoo_ty, #gfoo: &mut #gfoo_ty, #efoo: &mut #efoo_ty| {
-                    if let Some(#e) = #efoo.get_event() {
+                    if let Some(#e) = #engine_crate_path::#add_event::get_event(#efoo) {
                         #body
                     }
                 };

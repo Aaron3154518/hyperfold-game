@@ -31,8 +31,8 @@ pub trait GetPaths<const N: usize>: ExpandEnum<N> {
 
     // path::ident
     fn path_stem(&self) -> Vec<String> {
-        let mut v = vec![self.as_ident()];
-        v.append(&mut self.as_path());
+        let mut v = self.as_path();
+        v.push(self.as_ident());
         v.map_vec(|s| s.to_string())
     }
 
@@ -150,6 +150,10 @@ pub enum EngineIdents {
     IntersectMut,
     IntersectKeys,
     GetKeys,
+    // Events
+    CoreUpdate,
+    CoreEvents,
+    CoreRender,
 }
 
 impl GetPaths<{ Self::LEN }> for EngineIdents {
@@ -165,6 +169,9 @@ impl GetPaths<{ Self::LEN }> for EngineIdents {
             EngineIdents::IntersectMut => "intersect_mut",
             EngineIdents::IntersectKeys => "intersect_keys",
             EngineIdents::GetKeys => "get_keys",
+            EngineIdents::CoreUpdate => "Update",
+            EngineIdents::CoreEvents => "Events",
+            EngineIdents::CoreRender => "Render",
         }
     }
 
@@ -180,6 +187,9 @@ impl GetPaths<{ Self::LEN }> for EngineIdents {
             | EngineIdents::IntersectMut
             | EngineIdents::IntersectKeys
             | EngineIdents::GetKeys => vec!["intersect"],
+            EngineIdents::CoreUpdate | EngineIdents::CoreEvents | EngineIdents::CoreRender => {
+                vec!["core_events"]
+            }
         }
     }
 }
