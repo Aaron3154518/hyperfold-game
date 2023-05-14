@@ -20,10 +20,6 @@ pub trait GetPaths<const N: usize>: ExpandEnum<N> {
     // ident
     fn as_ident(&self) -> &str;
 
-    fn to_ident(&self) -> syn::Ident {
-        format_ident!("{}", self.as_ident())
-    }
-
     // path
     fn as_path(&self) -> Vec<&str> {
         Vec::new()

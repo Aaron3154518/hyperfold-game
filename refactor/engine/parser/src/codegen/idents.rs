@@ -12,7 +12,12 @@ pub enum Idents {
     SFoo,
     // Globals
     GFoo,
+    // Components
+    CFoo,
+    AddComponent,
     // Events
+    EFoo,
+    AddEvent,
     E,
     ELen,
     // Code generation
@@ -31,6 +36,10 @@ impl Idents {
             Idents::Namespace => NAMESPACE,
             Idents::SFoo => "SFoo",
             Idents::GFoo => "GFoo",
+            Idents::CFoo => EngineGlobals::CFoo.as_ident(),
+            Idents::AddComponent => NamespaceTraits::AddComponent.as_ident(),
+            Idents::EFoo => EngineGlobals::EFoo.as_ident(),
+            Idents::AddEvent => NamespaceTraits::AddEvent.as_ident(),
             Idents::E => "E",
             Idents::ELen => "E_LEN",
             Idents::GenE => "e",
