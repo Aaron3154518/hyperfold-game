@@ -154,6 +154,7 @@ impl Decoder {
             .map_vec(|p| syn::parse_str(&p).catch(format!("Could not parse path: {}", p)))
     }
 
+    // Must update generated mod as well
     fn codegen_dep(&self, cr_idx: usize, deps: &Vec<Vec<Dependency>>) -> TokenStream {
         let engine_paths = self.get_engine_trait_paths(cr_idx);
         let ns = format_ident!("{}", NAMESPACE);
@@ -269,7 +270,7 @@ impl Decoder {
             [EngineGlobals::Entity, EngineGlobals::EntityTrash].map(|eg| {
                 engine_globals[eg as usize].split(|cr_idx, _| {
                     let path = &crate_paths[*cr_idx];
-                    let ident = format_ident!("{}", EngineGlobals::Entity.as_str());
+                    let ident = format_ident!("{}", EngineGlobals::Entity.as_ident());
                     quote!(#path::#ident)
                 })
             });

@@ -26,6 +26,8 @@ pub struct MarkedItem {
 #[derive(Clone, Debug)]
 pub struct Symbol {
     pub ident: String,
+    // Use stmts: Includes ident/alias
+    // Other items: Doesn't include ident
     pub path: Vec<String>,
     pub public: bool,
 }

@@ -124,7 +124,7 @@ impl SystemRegexes {
     }
 
     pub fn parse_arg(&self, arg_str: &str) -> Option<FnArg> {
-        let eid_type = format_ident!("{}", EngineGlobals::Entity.as_str());
+        let eid_type = format_ident!("{}", EngineGlobals::Entity.as_ident());
 
         // Entity id
         self.id

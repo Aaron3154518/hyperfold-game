@@ -11,8 +11,9 @@ use super::{
     ast_mod::{Mod, ModType},
 };
 use crate::{
+    codegen::mods::{dependency_namespace_mod, entry_namespace_mod},
     resolve::ast_paths::Paths,
-    util::{Catch, SplitIter},
+    util::{end, Catch, SplitIter},
 };
 
 // TODO: hardcoded
@@ -151,6 +152,18 @@ impl Crate {
                     )
                 })
                 .collect()
+        }
+
+        // TODO: Auto detect game_crate macro (assume it exists and validate later)
+        // Add namespace mod to all crates except macro
+        // Must happen after the dependencies are set
+        let end = end(&crates, 1);
+        for (i, cr) in crates[..end].iter_mut().enumerate() {
+            cr.main.mods.push(if i == 0 {
+                entry_namespace_mod(&cr, cr.main.dir.to_owned(), cr.main.path.to_vec())
+            } else {
+                dependency_namespace_mod(&cr, cr.main.dir.to_owned(), cr.main.path.to_vec())
+            });
         }
 
         (crates, Paths::new(engine_cr_idx, macros_cr_idx))

@@ -133,8 +133,7 @@ impl FnArg {
             FnArgType::Trait(p) => items
                 .traits
                 .iter()
-                .enumerate()
-                .find_map(|(idx, tr)| (tr.path.path == p.path).then_some((0, idx))),
+                .find_map(|tr| (tr.path.path == p.path).then_some((tr.cr_idx, tr.g_idx))),
             _ => None,
         }
     }

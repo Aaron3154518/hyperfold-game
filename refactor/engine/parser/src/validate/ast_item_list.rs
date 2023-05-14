@@ -1,4 +1,10 @@
-use crate::resolve::ast_items::{Component, Event, Global, ItemsCrate};
+use crate::{
+    resolve::{
+        ast_items::{Component, Event, Global, ItemsCrate, Trait},
+        ast_paths::{EngineTraits, ExpandEnum, Paths},
+    },
+    util::{Catch, JoinMap, JoinMapInto},
+};
 
 // This struct is used to modify the lists of items
 // Traits: hardcodes traits
@@ -7,21 +13,15 @@ pub struct ItemList<'a> {
     pub components: Vec<Vec<&'a Component>>,
     pub globals: Vec<Vec<&'a Global>>,
     pub events: Vec<Vec<&'a Event>>,
-    pub traits: Vec<&'a Global>,
+    pub traits: Vec<Trait>,
 }
 
 impl<'a> ItemList<'a> {
-    pub fn from(crates: &'a Vec<ItemsCrate>, traits: &'a Vec<Global>) -> Self {
+    pub fn from(crates: &'a Vec<ItemsCrate>, paths: &Paths) -> Self {
         let (mut components, mut globals, mut events) = (Vec::new(), Vec::new(), Vec::new());
         for cr in crates.iter() {
             components.push(cr.components.iter().collect());
-            if cr.cr_idx == 0 {
-                let mut v: Vec<&Global> = traits.iter().collect();
-                v.extend(cr.globals.iter());
-                globals.push(v);
-            } else {
-                globals.push(cr.globals.iter().collect());
-            }
+            globals.push(cr.globals.iter().collect());
             events.push(cr.events.iter().collect());
         }
 
@@ -29,7 +29,22 @@ impl<'a> ItemList<'a> {
             components,
             globals,
             events,
-            traits: traits.iter().collect(),
+            traits: EngineTraits::VARIANTS.iter().map_vec(|tr| {
+                let gl = &paths.globals[tr.get_global() as usize];
+                let tr = &paths.traits[*tr as usize];
+                Trait {
+                    path: tr.to_owned(),
+                    cr_idx: 0,
+                    g_idx: crates[0]
+                        .globals
+                        .iter()
+                        .position(|g| g.path.path == gl.path)
+                        .catch(format!(
+                            "Could not find trait global: {}",
+                            gl.path.join("::")
+                        )),
+                }
+            }),
         }
     }
 }

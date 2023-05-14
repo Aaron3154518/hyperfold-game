@@ -1,4 +1,10 @@
-use crate::{codegen::idents::Idents, util::JoinMap};
+use quote::format_ident;
+
+use crate::{
+    codegen::idents::Idents,
+    util::{end, JoinMap},
+    validate::constants::NAMESPACE,
+};
 
 use super::ast_resolve::Path;
 
@@ -11,17 +17,34 @@ where
 }
 
 pub trait GetPaths<const N: usize>: ExpandEnum<N> {
-    fn as_str(&self) -> &str;
+    // ident
+    fn as_ident(&self) -> &str;
 
-    fn get_path(&self) -> Vec<String> {
-        vec!["crate", self.as_str()].map_vec(|s| s.to_string())
+    fn to_ident(&self) -> syn::Ident {
+        format_ident!("{}", self.as_ident())
     }
 
-    fn to_paths(cr_idx: usize) -> [Path; N] {
-        Self::VARIANTS.map(|v| Path {
+    // path
+    fn as_path(&self) -> Vec<&str> {
+        Vec::new()
+    }
+
+    // crate::path::ident
+    fn full_path(&self) -> Vec<String> {
+        [vec!["crate"], self.as_path(), vec![self.as_ident()]]
+            .concat()
+            .map_vec(|s| s.to_string())
+    }
+
+    fn crate_path(&self, cr_idx: usize) -> Path {
+        Path {
             cr_idx,
-            path: v.get_path(),
-        })
+            path: self.full_path(),
+        }
+    }
+
+    fn crate_paths(cr_idx: usize) -> [Path; N] {
+        Self::VARIANTS.map(|v| v.crate_path(cr_idx))
     }
 }
 
@@ -34,7 +57,7 @@ pub enum MacroPaths {
 }
 
 impl GetPaths<{ Self::LEN }> for MacroPaths {
-    fn as_str(&self) -> &str {
+    fn as_ident(&self) -> &str {
         match self {
             MacroPaths::Component => "component",
             MacroPaths::Global => "global",
@@ -50,12 +73,25 @@ pub enum EngineTraits {
     AddEvent,
 }
 
+impl EngineTraits {
+    pub fn get_global(&self) -> EngineGlobals {
+        match self {
+            EngineTraits::AddComponent => EngineGlobals::CFoo,
+            EngineTraits::AddEvent => EngineGlobals::EFoo,
+        }
+    }
+}
+
 impl GetPaths<{ Self::LEN }> for EngineTraits {
-    fn as_str(&self) -> &str {
+    fn as_ident(&self) -> &str {
         match self {
             EngineTraits::AddComponent => "AddComponent",
             EngineTraits::AddEvent => "AddEvent",
         }
+    }
+
+    fn as_path(&self) -> Vec<&str> {
+        vec![NAMESPACE]
     }
 }
 
@@ -72,7 +108,7 @@ pub enum EngineGlobals {
 }
 
 impl GetPaths<{ Self::LEN }> for EngineGlobals {
-    fn as_str(&self) -> &str {
+    fn as_ident(&self) -> &str {
         match self {
             EngineGlobals::CFoo => Idents::CFoo.as_str(),
             EngineGlobals::EFoo => Idents::EFoo.as_str(),
@@ -85,13 +121,19 @@ impl GetPaths<{ Self::LEN }> for EngineGlobals {
         }
     }
 
-    fn to_paths(cr_idx: usize) -> [Path; Self::LEN] {
-        Self::VARIANTS.map(|v| Path {
-            cr_idx: match v {
+    fn as_path(&self) -> Vec<&str> {
+        match self {
+            EngineGlobals::CFoo | EngineGlobals::EFoo => vec![NAMESPACE],
+            _ => Vec::new(),
+        }
+    }
+
+    fn crate_paths(cr_idx: usize) -> [Path; Self::LEN] {
+        Self::VARIANTS.map(|v| {
+            v.crate_path(match v {
                 EngineGlobals::CFoo | EngineGlobals::EFoo => 0,
                 _ => cr_idx,
-            },
-            path: v.get_path(),
+            })
         })
     }
 }
@@ -107,7 +149,7 @@ pub enum EngineContainers {
 }
 
 impl GetPaths<{ Self::LEN }> for EngineContainers {
-    fn as_str(&self) -> &str {
+    fn as_ident(&self) -> &str {
         match self {
             EngineContainers::Container => "Container",
             EngineContainers::Label => "Label",
@@ -130,10 +172,10 @@ pub struct Paths {
 impl Paths {
     pub fn new(engine_cr_idx: usize, macros_cr_idx: usize) -> Self {
         Self {
-            macros: MacroPaths::to_paths(macros_cr_idx),
-            traits: EngineTraits::to_paths(engine_cr_idx),
-            globals: EngineGlobals::to_paths(engine_cr_idx),
-            containers: EngineContainers::to_paths(engine_cr_idx),
+            macros: MacroPaths::crate_paths(macros_cr_idx),
+            traits: EngineTraits::crate_paths(engine_cr_idx),
+            globals: EngineGlobals::crate_paths(engine_cr_idx),
+            containers: EngineContainers::crate_paths(engine_cr_idx),
         }
     }
 

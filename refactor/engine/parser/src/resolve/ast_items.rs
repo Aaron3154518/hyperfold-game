@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use crate::{
+    codegen::mods::entry_namespace_items,
     parse::{
         ast_crate::Crate,
         ast_fn_arg::{FnArg, FnArgType},
@@ -27,6 +28,13 @@ pub struct Component {
 pub struct Global {
     pub path: Path,
     pub args: GlobalMacroArgs,
+}
+
+#[derive(Clone, Debug)]
+pub struct Trait {
+    pub path: Path,
+    pub cr_idx: usize,
+    pub g_idx: usize,
 }
 
 #[derive(Debug)]
@@ -88,6 +96,11 @@ impl ItemsCrate {
             })
             .collect::<Vec<_>>();
         self.parse_mod(cr, &cr.main, paths, crates);
+
+        // Add globals to entry crate
+        if self.cr_idx == 0 {
+            entry_namespace_items(self);
+        }
     }
 
     pub fn parse_mod(&mut self, cr: &Crate, m: &Mod, paths: &Paths, crates: &Vec<Crate>) {

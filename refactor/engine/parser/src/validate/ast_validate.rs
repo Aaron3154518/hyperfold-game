@@ -9,7 +9,7 @@ use shared::parse_args::{ComponentMacroArgs, GlobalMacroArgs};
 use crate::{
     parse::ast_fn_arg::{FnArg, FnArgType},
     resolve::{
-        ast_items::{Component, Dependency, Event, Global, ItemsCrate, System},
+        ast_items::{Component, Dependency, Event, Global, ItemsCrate, System, Trait},
         ast_paths::{EngineGlobals, EngineTraits, ExpandEnum, Paths},
         ast_resolve::Path,
     },
@@ -45,22 +45,8 @@ impl ItemData {
         // Sort in order of crate index
         crates.sort_by_key(|cr| cr.cr_idx);
 
-        let traits = [
-            paths.get_global(EngineGlobals::CFoo),
-            paths.get_global(EngineGlobals::EFoo),
-        ]
-        .map(|path| Global {
-            path: path.to_owned(),
-            args: GlobalMacroArgs {
-                is_dummy: false,
-                is_const: false,
-                is_trait: true,
-            },
-        })
-        .to_vec();
-
         // Collect items
-        let items = ItemList::from(crates, &traits);
+        let items = ItemList::from(crates, &paths);
 
         let data = Data::VARIANTS
             .map(|dv| match dv {
