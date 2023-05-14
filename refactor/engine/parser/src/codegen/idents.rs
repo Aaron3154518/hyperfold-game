@@ -1,11 +1,10 @@
 use quote::format_ident;
 
 use crate::{
-    resolve::ast_paths::{EngineTraits, ExpandEnum, GetPaths},
+    resolve::ast_paths::{EngineGlobals, EngineTraits, ExpandEnum, GetPaths, NamespaceTraits},
     validate::constants::NAMESPACE,
 };
 
-#[shared::macros::expand_enum]
 pub enum Idents {
     // General
     Namespace,
@@ -13,12 +12,7 @@ pub enum Idents {
     SFoo,
     // Globals
     GFoo,
-    // Components
-    AddComponent,
-    CFoo,
     // Events
-    AddEvent,
-    EFoo,
     E,
     ELen,
     // Code generation
@@ -37,10 +31,6 @@ impl Idents {
             Idents::Namespace => NAMESPACE,
             Idents::SFoo => "SFoo",
             Idents::GFoo => "GFoo",
-            Idents::AddComponent => EngineTraits::AddComponent.as_ident(),
-            Idents::CFoo => "CFoo",
-            Idents::AddEvent => EngineTraits::AddEvent.as_ident(),
-            Idents::EFoo => "EFoo",
             Idents::E => "E",
             Idents::ELen => "E_LEN",
             Idents::GenE => "e",

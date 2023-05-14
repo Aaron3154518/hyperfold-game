@@ -73,25 +73,12 @@ pub enum EngineTraits {
     AddEvent,
 }
 
-impl EngineTraits {
-    pub fn get_global(&self) -> EngineGlobals {
-        match self {
-            EngineTraits::AddComponent => EngineGlobals::CFoo,
-            EngineTraits::AddEvent => EngineGlobals::EFoo,
-        }
-    }
-}
-
 impl GetPaths<{ Self::LEN }> for EngineTraits {
     fn as_ident(&self) -> &str {
         match self {
             EngineTraits::AddComponent => "AddComponent",
             EngineTraits::AddEvent => "AddEvent",
         }
-    }
-
-    fn as_path(&self) -> Vec<&str> {
-        vec![NAMESPACE]
     }
 }
 
@@ -110,8 +97,8 @@ pub enum EngineGlobals {
 impl GetPaths<{ Self::LEN }> for EngineGlobals {
     fn as_ident(&self) -> &str {
         match self {
-            EngineGlobals::CFoo => Idents::CFoo.as_str(),
-            EngineGlobals::EFoo => Idents::EFoo.as_str(),
+            EngineGlobals::CFoo => "CFoo",
+            EngineGlobals::EFoo => "EFoo",
             EngineGlobals::Entity => "Entity",
             EngineGlobals::EntityTrash => "EntityTrash",
             EngineGlobals::Event => "Event",
@@ -158,6 +145,36 @@ impl GetPaths<{ Self::LEN }> for EngineContainers {
             EngineContainers::NandLabels => "NandLabels",
             EngineContainers::NorLabels => "NorLabels",
         }
+    }
+}
+
+#[shared::macros::expand_enum]
+pub enum NamespaceTraits {
+    AddComponent,
+    AddEvent,
+}
+
+impl NamespaceTraits {
+    pub fn get_global(&self) -> EngineGlobals {
+        match self {
+            NamespaceTraits::AddComponent => EngineGlobals::CFoo,
+            NamespaceTraits::AddEvent => EngineGlobals::EFoo,
+        }
+    }
+}
+
+impl GetPaths<{ Self::LEN }> for NamespaceTraits {
+    fn as_ident(&self) -> &str {
+        match self {
+            NamespaceTraits::AddComponent => "Poopy",
+            NamespaceTraits::AddEvent => "Peepee",
+            // NamespaceTraits::AddComponent => EngineTraits::AddComponent.as_ident(),
+            // NamespaceTraits::AddEvent => EngineTraits::AddEvent.as_ident(),
+        }
+    }
+
+    fn as_path(&self) -> Vec<&str> {
+        vec![NAMESPACE]
     }
 }
 

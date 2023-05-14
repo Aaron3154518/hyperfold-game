@@ -1,9 +1,12 @@
 use std::{env, path::PathBuf};
 
-use parser::codegen::codegen::Decoder;
+use parser::{codegen::codegen::Decoder, util::format_code};
 use proc_macro::TokenStream;
 use quote::quote;
-use shared::parse_args::{ComponentMacroArgs, GlobalMacroArgs};
+use shared::{
+    file::Out,
+    parse_args::{ComponentMacroArgs, GlobalMacroArgs},
+};
 use syn::{parse_macro_input, parse_quote};
 
 #[proc_macro_attribute]
@@ -53,6 +56,13 @@ pub fn game_crate(_input: TokenStream) -> TokenStream {
     let decoder = Decoder::new();
     let code = decoder.codegen(PathBuf::from(
         env::var("CARGO_MANIFEST_DIR").expect("No manifest directory specified"),
+    ));
+
+    let mut f = Out::new("out2.txt", true);
+    f.write(format!(
+        "{}:\n{}\n",
+        env::var("CARGO_MANIFEST_DIR").expect("No manifest directory specified"),
+        format_code(code.to_string())
     ));
 
     code.into()

@@ -7,7 +7,7 @@ use syn::{PathArguments, PathSegment};
 
 use crate::{
     codegen::dependency::get_deps_post_order,
-    resolve::ast_paths::{EngineGlobals, EngineTraits, ExpandEnum, GetPaths},
+    resolve::ast_paths::{EngineGlobals, EngineTraits, ExpandEnum, GetPaths, NamespaceTraits},
     util::{Catch, JoinMap, JoinMapInto, SplitCollect, SplitIter},
     validate::{
         ast_validate::Data,
@@ -164,7 +164,7 @@ impl Decoder {
             .collect::<Vec<_>>();
 
         // Aggregate AddComponent traits and dependencies
-        let add_comp = Idents::AddComponent.to_ident();
+        let add_comp = NamespaceTraits::AddComponent.to_ident();
         let add_comp_tr = &engine_paths[EngineTraits::AddComponent as usize];
         let mut comp_trs = self
             .get_structs(cr_idx, "crate".to_string(), Data::Components)
@@ -185,7 +185,7 @@ impl Decoder {
         };
 
         // Aggregate AddEvent traits and dependencies
-        let add_event = Idents::AddEvent.to_ident();
+        let add_event = NamespaceTraits::AddEvent.to_ident();
         let add_event_tr = &engine_paths[EngineTraits::AddEvent as usize];
         let mut event_trs = self
             .get_structs(cr_idx, "crate".to_string(), Data::Events)
@@ -276,9 +276,9 @@ impl Decoder {
             });
 
         // Component manager
-        let add_comp = Idents::AddComponent.to_ident();
+        let add_comp = NamespaceTraits::AddComponent.to_ident();
         let add_comp_tr = &engine_trait_paths[EngineTraits::AddComponent as usize];
-        let cfoo_ident = Idents::CFoo.to_ident();
+        let cfoo_ident = EngineGlobals::CFoo.to_ident();
         let cfoo_def = quote!(
             pub struct #cfoo_ident {
                 eids: std::collections::HashSet<#gp_entity>,
@@ -320,7 +320,7 @@ impl Decoder {
         );
 
         // Event manager
-        let add_event = Idents::AddEvent.to_ident();
+        let add_event = NamespaceTraits::AddEvent.to_ident();
         let add_event_tr = &engine_trait_paths[EngineTraits::AddEvent as usize];
         let e_ident = Idents::E.to_ident();
         let e_len_ident = Idents::ELen.to_ident();
@@ -332,7 +332,7 @@ impl Decoder {
             }
             pub const #e_len_ident: usize = #e_len;
         );
-        let efoo_ident = Idents::EFoo.to_ident();
+        let efoo_ident = EngineGlobals::EFoo.to_ident();
         let efoo_def = quote!(
             #[derive(Debug)]
             pub struct #efoo_ident {

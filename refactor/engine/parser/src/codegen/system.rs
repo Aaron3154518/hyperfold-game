@@ -476,8 +476,8 @@ impl System {
             )
         };
 
-        let [cfoo_ty, gfoo_ty, efoo_ty] =
-            [Idents::CFoo, Idents::GFoo, Idents::EFoo].map(|i| i.to_ident());
+        let [cfoo_ty, efoo_ty] = [EngineGlobals::CFoo, EngineGlobals::EFoo].map(|i| i.to_ident());
+        let gfoo_ty = Idents::GFoo.to_ident();
         let [cfoo, gfoo, efoo] =
             [Idents::GenCFoo, Idents::GenGFoo, Idents::GenEFoo].map(|i| i.to_ident());
 

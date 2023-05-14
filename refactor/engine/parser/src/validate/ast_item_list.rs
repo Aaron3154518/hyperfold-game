@@ -1,7 +1,8 @@
 use crate::{
     resolve::{
         ast_items::{Component, Event, Global, ItemsCrate, Trait},
-        ast_paths::{EngineTraits, ExpandEnum, Paths},
+        ast_paths::{EngineTraits, ExpandEnum, GetPaths, NamespaceTraits, Paths},
+        ast_resolve::Path,
     },
     util::{Catch, JoinMap, JoinMapInto},
 };
@@ -29,11 +30,13 @@ impl<'a> ItemList<'a> {
             components,
             globals,
             events,
-            traits: EngineTraits::VARIANTS.iter().map_vec(|tr| {
+            traits: NamespaceTraits::VARIANTS.iter().map_vec(|tr| {
                 let gl = &paths.globals[tr.get_global() as usize];
-                let tr = &paths.traits[*tr as usize];
                 Trait {
-                    path: tr.to_owned(),
+                    path: Path {
+                        cr_idx: 0,
+                        path: tr.full_path(),
+                    },
                     cr_idx: 0,
                     g_idx: crates[0]
                         .globals

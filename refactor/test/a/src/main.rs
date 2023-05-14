@@ -38,7 +38,7 @@ fn comp(
     dc: &c::e::DC,
     sc: Label<T6>,
     re: NorLabels<(a2::a3::a::A, a2::a3::a::A)>,
-    t: &dyn crate::_engine::AddEvent,
+    t: &dyn crate::_engine::Peepee,
 ) {
 }
 
@@ -49,12 +49,12 @@ fn vec(
     sc: Label<T6>,
     re: NorLabels<(a2::a3::a::A, a2::a3::a::A)>,
     vc: Container<(&mut T6, &engine::Entity)>,
-    t: &dyn crate::_engine::AddEvent,
+    t: &dyn crate::_engine::Peepee,
 ) {
 }
 
 #[engine::system(Init)]
-fn init(t: &dyn crate::_engine::AddEvent) {}
+fn init(t: &dyn crate::_engine::Peepee) {}
 
 fn main() {
     println!("Hello, world!");

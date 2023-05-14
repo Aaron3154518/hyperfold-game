@@ -9,7 +9,9 @@ use crate::{
     },
     resolve::{
         ast_items::{Global, ItemsCrate},
-        ast_paths::{EngineGlobals, EngineTraits, ExpandEnum, GetPaths, MacroPaths},
+        ast_paths::{
+            EngineGlobals, EngineTraits, ExpandEnum, GetPaths, MacroPaths, NamespaceTraits,
+        },
         ast_resolve::Path,
     },
     util::{JoinMap, JoinMapInto},
@@ -19,7 +21,7 @@ use crate::{
 use super::idents::Idents;
 
 pub fn entry_namespace_items(items: &mut ItemsCrate) {
-    for tr in EngineTraits::VARIANTS.iter() {
+    for tr in NamespaceTraits::VARIANTS.iter() {
         items.globals.push(Global {
             path: Path {
                 cr_idx: items.cr_idx,
@@ -33,7 +35,7 @@ pub fn entry_namespace_items(items: &mut ItemsCrate) {
 pub fn entry_namespace_mod(cr: &Crate, dir: PathBuf, mods: Vec<String>) -> Mod {
     let mut m = dependency_namespace_mod(cr, dir, mods);
     // Foo structs
-    for tr in EngineTraits::VARIANTS.iter() {
+    for tr in NamespaceTraits::VARIANTS.iter() {
         let gl = tr.get_global();
         let sym = Symbol {
             ident: gl.as_ident().to_string(),
@@ -53,7 +55,7 @@ pub fn dependency_namespace_mod(cr: &Crate, dir: PathBuf, mut mods: Vec<String>)
         path: mods,
         mods: Vec::new(),
         // Traits
-        symbols: EngineTraits::VARIANTS.iter().map_vec(|tr| Symbol {
+        symbols: NamespaceTraits::VARIANTS.iter().map_vec(|tr| Symbol {
             ident: tr.as_ident().to_string(),
             path: tr.full_path(),
             public: true,
