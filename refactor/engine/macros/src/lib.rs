@@ -54,12 +54,14 @@ pub fn event(_input: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn game_crate(_input: TokenStream) -> TokenStream {
     let decoder = Decoder::new();
-    let code = decoder.codegen(PathBuf::from(
+    let (cr_idx, code) = decoder.codegen(PathBuf::from(
         env::var("CARGO_MANIFEST_DIR").expect("No manifest directory specified"),
     ));
 
-    let mut f = Out::new("out2.rs", false);
-    f.write(format!("{}\n", format_code(code.to_string())));
+    if cr_idx == 0 {
+        let mut f = Out::new("out2.rs", false);
+        f.write(format!("{}\n", format_code(code.to_string())));
+    }
 
     code.into()
 }

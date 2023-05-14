@@ -1,7 +1,9 @@
+#![feature(hash_drain_filter)]
+
 use std::marker::PhantomData;
 
-// The path resolver can't find the macro paths in "macros" so they will be labelled under "engine"
 pub use macros::*;
+pub mod intersect;
 
 game_crate!();
 
@@ -17,7 +19,7 @@ impl Entity {
 }
 
 #[global]
-pub struct EntityTrash(Vec<Entity>);
+pub struct EntityTrash(pub Vec<Entity>);
 
 impl EntityTrash {
     pub fn new() -> Self {

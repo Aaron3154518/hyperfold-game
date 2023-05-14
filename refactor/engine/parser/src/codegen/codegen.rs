@@ -146,6 +146,14 @@ impl Decoder {
             .map_vec(|p| syn::parse_str(&p).catch(format!("Could not parse path: {}", p)))
     }
 
+    fn get_engine_crate_index(&self) -> usize {
+        self.data[Data::EngineCrateIdx as usize]
+            .get(0)
+            .expect("Could not get engine crate index")
+            .parse()
+            .expect("Could not parse engine crate index")
+    }
+
     // Must update generated mod as well
     fn codegen_dep(&self, cr_idx: usize, deps: &Vec<Vec<Dependency>>) -> TokenStream {
         let engine_paths = self.get_engine_trait_paths(cr_idx);
@@ -386,7 +394,7 @@ impl Decoder {
                 impl #add_event_tr<#e_tys> for #efoo_ident {
                     fn new_event(&mut self, t: #e_tys) {
                         self.#e_vars.push(t);
-                        self.add_event(#e_ident::#e_vars);
+                        self.add_event(#e_ident::#e_varis);
                     }
 
                     fn get_event<'a>(&'a self) -> Option<&'a #e_tys> {
@@ -410,6 +418,8 @@ impl Decoder {
         let g_efoo = &engine_globals[EngineGlobals::EFoo as usize];
         let g_cfoo = &engine_globals[EngineGlobals::CFoo as usize];
 
+        let engine_cr_idx = self.get_engine_crate_index();
+
         // Systems
         let systems =
             crate_paths
@@ -422,12 +432,12 @@ impl Decoder {
         let init_systems_code = systems
             .iter()
             .filter(|s| s.is_init)
-            .map(|s| s.to_quote())
+            .map(|s| s.to_quote(&crate_paths[engine_cr_idx]))
             .collect::<Vec<_>>();
         let systems_code = systems
             .iter()
             .filter(|s| !s.is_init)
-            .map(|s| s.to_quote())
+            .map(|s| s.to_quote(&crate_paths[engine_cr_idx]))
             .collect::<Vec<_>>();
 
         let [cfoo, gfoo, efoo] =
@@ -602,7 +612,7 @@ impl Decoder {
         )
     }
 
-    pub fn codegen(&self, dir: PathBuf) -> TokenStream {
+    pub fn codegen(&self, dir: PathBuf) -> (usize, TokenStream) {
         let ns: proc_macro2::Ident = format_ident!("{}", NAMESPACE);
         let dir = fs::canonicalize(dir.to_owned())
             .catch(format!("Could not canonicalize path: {}", dir.display()));
@@ -616,10 +626,13 @@ impl Decoder {
             0 => self.codegen_entry(cr_idx, &deps),
             _ => self.codegen_dep(cr_idx, &deps),
         };
-        quote!(
-            pub mod #ns {
-                #code
-            }
+        (
+            cr_idx,
+            quote!(
+                pub mod #ns {
+                    #code
+                }
+            ),
         )
     }
 }

@@ -111,6 +111,6 @@ fn test() {
     // println!("{:#?}", decoder);
     println!(
         "{}",
-        format_code(decoder.codegen(PathBuf::from("./test/a")).to_string())
+        format_code(decoder.codegen(PathBuf::from("./test/a")).1.to_string())
     );
 }

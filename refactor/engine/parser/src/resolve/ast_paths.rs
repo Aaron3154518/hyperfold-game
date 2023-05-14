@@ -29,6 +29,13 @@ pub trait GetPaths<const N: usize>: ExpandEnum<N> {
         Vec::new()
     }
 
+    // path::ident
+    fn path_stem(&self) -> Vec<String> {
+        let mut v = vec![self.as_ident()];
+        v.append(&mut self.as_path());
+        v.map_vec(|s| s.to_string())
+    }
+
     // crate::path::ident
     fn full_path(&self) -> Vec<String> {
         [vec!["crate"], self.as_path(), vec![self.as_ident()]]
@@ -48,6 +55,7 @@ pub trait GetPaths<const N: usize>: ExpandEnum<N> {
     }
 }
 
+// Paths to marker macros
 #[shared::macros::expand_enum]
 pub enum MacroPaths {
     Component,
@@ -67,6 +75,7 @@ impl GetPaths<{ Self::LEN }> for MacroPaths {
     }
 }
 
+// Paths to base trait definitions use in codegen
 #[shared::macros::expand_enum]
 pub enum EngineTraits {
     AddComponent,
@@ -82,6 +91,7 @@ impl GetPaths<{ Self::LEN }> for EngineTraits {
     }
 }
 
+// Paths to globals needed by codegen
 #[shared::macros::expand_enum]
 pub enum EngineGlobals {
     CFoo,
@@ -125,29 +135,56 @@ impl GetPaths<{ Self::LEN }> for EngineGlobals {
     }
 }
 
+// Paths to engine items needed by parsing
 #[shared::macros::expand_enum]
-pub enum EngineContainers {
+pub enum EngineIdents {
+    // Containers
     Container,
     Label,
     AndLabels,
     OrLabels,
     NandLabels,
     NorLabels,
+    // Functions
+    Intersect,
+    IntersectMut,
+    IntersectKeys,
+    GetKeys,
 }
 
-impl GetPaths<{ Self::LEN }> for EngineContainers {
+impl GetPaths<{ Self::LEN }> for EngineIdents {
     fn as_ident(&self) -> &str {
         match self {
-            EngineContainers::Container => "Container",
-            EngineContainers::Label => "Label",
-            EngineContainers::AndLabels => "AndLabels",
-            EngineContainers::OrLabels => "OrLabels",
-            EngineContainers::NandLabels => "NandLabels",
-            EngineContainers::NorLabels => "NorLabels",
+            EngineIdents::Container => "Container",
+            EngineIdents::Label => "Label",
+            EngineIdents::AndLabels => "AndLabels",
+            EngineIdents::OrLabels => "OrLabels",
+            EngineIdents::NandLabels => "NandLabels",
+            EngineIdents::NorLabels => "NorLabels",
+            EngineIdents::Intersect => "intersect",
+            EngineIdents::IntersectMut => "intersect_mut",
+            EngineIdents::IntersectKeys => "intersect_keys",
+            EngineIdents::GetKeys => "get_keys",
+        }
+    }
+
+    fn as_path(&self) -> Vec<&str> {
+        match self {
+            EngineIdents::Container
+            | EngineIdents::Label
+            | EngineIdents::AndLabels
+            | EngineIdents::OrLabels
+            | EngineIdents::NandLabels
+            | EngineIdents::NorLabels => vec![],
+            EngineIdents::Intersect
+            | EngineIdents::IntersectMut
+            | EngineIdents::IntersectKeys
+            | EngineIdents::GetKeys => vec!["intersect"],
         }
     }
 }
 
+// Paths to traits that appear in generated namespace
 #[shared::macros::expand_enum]
 pub enum NamespaceTraits {
     AddComponent,
@@ -180,19 +217,21 @@ impl GetPaths<{ Self::LEN }> for NamespaceTraits {
 
 #[derive(Clone, Debug)]
 pub struct Paths {
+    pub engine_cr_idx: usize,
     pub macros: [Path; MacroPaths::LEN],
     pub traits: [Path; EngineTraits::LEN],
     pub globals: [Path; EngineGlobals::LEN],
-    pub containers: [Path; EngineContainers::LEN],
+    pub idents: [Path; EngineIdents::LEN],
 }
 
 impl Paths {
     pub fn new(engine_cr_idx: usize, macros_cr_idx: usize) -> Self {
         Self {
+            engine_cr_idx,
             macros: MacroPaths::crate_paths(macros_cr_idx),
             traits: EngineTraits::crate_paths(engine_cr_idx),
             globals: EngineGlobals::crate_paths(engine_cr_idx),
-            containers: EngineContainers::crate_paths(engine_cr_idx),
+            idents: EngineIdents::crate_paths(engine_cr_idx),
         }
     }
 
@@ -208,7 +247,7 @@ impl Paths {
         &self.globals[i as usize]
     }
 
-    pub fn get_container(&self, i: EngineContainers) -> &Path {
-        &self.containers[i as usize]
+    pub fn get_container(&self, i: EngineIdents) -> &Path {
+        &self.idents[i as usize]
     }
 }

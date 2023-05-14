@@ -8,9 +8,12 @@ use quote::quote;
 use regex::Regex;
 
 use crate::codegen::idents::Idents;
+use crate::codegen::util::arr_to_path;
 use crate::codegen::util::string_to_type;
 use crate::codegen::util::type_to_type;
+use crate::codegen::util::vec_to_path;
 use crate::resolve::ast_paths::EngineGlobals;
+use crate::resolve::ast_paths::EngineIdents;
 use crate::resolve::ast_paths::GetPaths;
 use crate::util::Flatten;
 use crate::util::JoinMap;
@@ -76,7 +79,7 @@ impl SystemRegexes {
         let id = r"id";
         let c = r"c\d+_\d+";
         let g = r"g\d+_\d+";
-        let e = r"e\d+_\d+";
+        let e = r"E\d+_\d+";
         let l = format!(r"l(!)?[\|&]{c}(-{c})*");
         let v_c = format!(r"(m)?{c}");
         let v_i = format!(r"{v_c}|{id}");
@@ -367,7 +370,7 @@ impl System {
         }
     }
 
-    pub fn to_quote(&self) -> TokenStream {
+    pub fn to_quote(&self, engine_crate_path: &syn::Path) -> TokenStream {
         let f = &self.name;
         let args = &self.args;
 
@@ -379,8 +382,11 @@ impl System {
 
             let eid = Idents::GenEid.to_ident();
 
+            let [get_keys, intersect_keys] = [EngineIdents::GetKeys, EngineIdents::IntersectKeys]
+                .map(|i| vec_to_path(i.path_stem()));
+
             quote!(
-                for #eid in crate::ecs::shared::intersect::intersect_keys(&mut [#(crate::ecs::shared::intersect::get_keys(&cfoo.#c_args)),*]).iter() {
+                for #eid in #engine_crate_path::#intersect_keys(&mut [#(#engine_crate_path::#get_keys(&cfoo.#c_args)),*]).iter() {
                     if let (#(Some(#c_args),)*) = (#(cfoo.#c_args.get_mut(#eid),)*) {
                         #label_checks
                     }
@@ -410,7 +416,8 @@ impl System {
             let tuple_init = syn::parse_str::<syn::ExprClosure>(tuple_init.as_str())
                 .expect("Could not parse tuple init closure");
 
-            let [v, eid] = [Idents::GenV, Idents::GenEid].map(|i| i.to_ident());
+            let [cfoo, v, eid] =
+                [Idents::GenCFoo, Idents::GenV, Idents::GenEid].map(|i| i.to_ident());
 
             // Intersect with tail args
             let intersect_stmts = self.c_args[1..]
@@ -419,17 +426,20 @@ impl System {
                 .enumerate()
                 .filter_map(|(i, (a, ty))| match ty {
                     ContainerArg::EntityId(_) => None,
-                    ContainerArg::Component(_,_, m) => Some(
-                        syn::parse_str::<syn::ExprCall>(
-                            format!(
-                                "crate::ecs::shared::intersect::intersect{}({v}, &mut cfoo.{a}, |t| &mut t.{})",
-                                if *m { "_mut" } else { "" },
-                                i + 1
-                            )
-                            .as_str(),
-                        )
-                        .expect("Could not parse intersect call"),
-                    ),
+                    ContainerArg::Component(_, _, m) => {
+                        let intersect = vec_to_path(
+                            if *m {
+                                EngineIdents::IntersectMut
+                            } else {
+                                EngineIdents::Intersect
+                            }
+                            .path_stem(),
+                        );
+                        let i = format_ident!("{}", i + 1);
+                        Some(quote!(
+                            #engine_crate_path::#intersect(#v, &mut #cfoo.#a, |t| &mut t.#i)
+                        ))
+                    }
                 })
                 .collect::<Vec<_>>();
 
@@ -458,11 +468,12 @@ impl System {
 
             let label_checks = self.quote_labels(quote!(return Some((#(#all_args,)*));));
 
+            //(#(Option<#v_types>,)*)
             quote!(
                 let mut #v = cfoo.#arg
                     .#iter()
                     .map(#tuple_init)
-                    .collect::<std::collections::HashMap<_, (#(Option<#v_types>,)*)>>();
+                    .collect::<std::collections::HashMap<_, _>>();
                 #(#v = #intersect_stmts;)*
                 let #v = #v
                     .into_iter()

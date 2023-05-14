@@ -33,6 +33,7 @@ pub enum Data {
     EngineTraits,
     EngineGlobals,
     CratePaths,
+    EngineCrateIdx,
 }
 
 #[derive(Debug)]
@@ -108,6 +109,7 @@ impl ItemData {
                         .join("::")
                     )
                 }),
+                Data::EngineCrateIdx => vec![format!("{}", paths.engine_cr_idx)],
             })
             .map(|v| {
                 if let Some(s) = v.iter().find(|s| s.contains(SEP)) {

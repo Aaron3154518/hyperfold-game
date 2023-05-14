@@ -6,7 +6,7 @@ use crate::{
     parse::ast_fn_arg::{FnArg, FnArgType},
     resolve::{
         ast_items::{ItemsCrate, System},
-        ast_paths::{EngineContainers, EngineGlobals, Paths},
+        ast_paths::{EngineGlobals, EngineIdents, Paths},
         ast_resolve::Path,
     },
     util::JoinMap,
@@ -151,15 +151,13 @@ impl FnArg {
     fn to_label(&self, paths: &Paths) -> Option<(&str, Vec<&FnArg>)> {
         match &self.ty {
             FnArgType::SContainer(p, a) => {
-                (p == paths.get_container(EngineContainers::Label)).then(|| ("&", vec![&**a]))
+                (p == paths.get_container(EngineIdents::Label)).then(|| ("&", vec![&**a]))
             }
-            FnArgType::Container(p, v) => (p == paths.get_container(EngineContainers::AndLabels))
+            FnArgType::Container(p, v) => (p == paths.get_container(EngineIdents::AndLabels))
                 .then_some("&")
-                .or_else(|| (p == paths.get_container(EngineContainers::OrLabels)).then_some("|"))
-                .or_else(|| {
-                    (p == paths.get_container(EngineContainers::NandLabels)).then_some("|&")
-                })
-                .or_else(|| (p == paths.get_container(EngineContainers::NorLabels)).then_some("!|"))
+                .or_else(|| (p == paths.get_container(EngineIdents::OrLabels)).then_some("|"))
+                .or_else(|| (p == paths.get_container(EngineIdents::NandLabels)).then_some("|&"))
+                .or_else(|| (p == paths.get_container(EngineIdents::NorLabels)).then_some("!|"))
                 .map(|l_ty| (l_ty, v.iter().collect())),
             _ => None,
         }
@@ -167,8 +165,9 @@ impl FnArg {
 
     fn to_container(&self, paths: &Paths) -> Option<Vec<&FnArg>> {
         match &self.ty {
-            FnArgType::Container(p, v) => (p == paths.get_container(EngineContainers::Container))
-                .then_some(v.iter().collect()),
+            FnArgType::Container(p, v) => {
+                (p == paths.get_container(EngineIdents::Container)).then_some(v.iter().collect())
+            }
             _ => None,
         }
     }
