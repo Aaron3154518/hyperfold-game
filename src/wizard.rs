@@ -1,22 +1,23 @@
-use hyperfold_engine::ecs;
 use hyperfold_engine::ecs::components::Label;
-use hyperfold_engine::ecs::events::CoreEvent;
+use hyperfold_engine::ecs::entities::{Entity, NewEntity};
+use hyperfold_engine::ecs::events::core;
 use hyperfold_engine::framework::{event_system, physics, render_system};
-use hyperfold_engine::includes::*;
 use hyperfold_engine::sdl2::SDL_KeyCode::*;
 use hyperfold_engine::utils::rect::{Align, Rect};
 
-#[ecs::component]
+#[hyperfold_engine::component]
 struct Wizard;
 
-#[ecs::system(Init)]
+#[hyperfold_engine::system(Init)]
 fn init_wizard(
-    entities: &mut dyn crate::CFooT,
+    entities: &mut dyn crate::_engine::AddComponent,
     rs: &mut render_system::RenderSystem,
     camera: &render_system::Camera,
 ) {
-    let e = ecs::create_entity!(
+    let e = Entity::new();
+    hyperfold_engine::add_components!(
         entities,
+        e,
         render_system::Elevation(1),
         render_system::Image(rs.get_image("res/wizards/wizard.png")),
         physics::Position(Rect {
@@ -30,9 +31,9 @@ fn init_wizard(
     );
 }
 
-#[ecs::system]
+#[hyperfold_engine::system]
 fn track_wizard(
-    _ev: &CoreEvent::Update,
+    _ev: &core::Update,
     pos: &physics::Position,
     camera: &mut render_system::Camera,
     _l: Label<Wizard>,
@@ -42,8 +43,8 @@ fn track_wizard(
         .set_pos(pos.0.cx(), pos.0.cy(), Align::Center, Align::Center)
 }
 
-#[ecs::system]
-fn move_keys(ev: &event_system::Events::Key, pd: &mut physics::PhysicsData, _l: Label<Wizard>) {
+#[hyperfold_engine::system]
+fn move_keys(ev: &event_system::inputs::Key, pd: &mut physics::PhysicsData, _l: Label<Wizard>) {
     const V: f32 = 250.0;
     if let Some((val, amnt)) = match ev.0.key {
         SDLK_a => Some((&mut pd.v.x, -V)),

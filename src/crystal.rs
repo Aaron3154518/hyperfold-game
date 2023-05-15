@@ -1,16 +1,19 @@
-use hyperfold_engine::ecs;
-use hyperfold_engine::framework::{physics, render_system};
-use hyperfold_engine::includes::*;
-use hyperfold_engine::utils::rect::Rect;
+use hyperfold_engine::{
+    ecs::entities::{Entity, NewEntity},
+    framework::{physics, render_system},
+    utils::rect::Rect,
+};
 
-#[ecs::system(Init)]
+#[hyperfold_engine::system(Init)]
 fn init_crystal(
-    entities: &mut dyn crate::CFooT,
+    entities: &mut dyn crate::_engine::AddComponent,
     rs: &mut render_system::RenderSystem,
     camera: &render_system::Camera,
 ) {
-    let e = ecs::create_entity!(
+    let e = Entity::new();
+    hyperfold_engine::add_components!(
         entities,
+        e,
         render_system::Elevation(0),
         render_system::Image(rs.get_image("res/wizards/crystal.png")),
         physics::Position(Rect {

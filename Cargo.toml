@@ -5,8 +5,5 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dependencies.hyperfold_engine]
-version = "0.1.0"
-path = "./dummy/hyperfold-engine/"
-package = "hyperfold_engine"
-features = []
+[dependencies]
+hyperfold_engine = { path = "./hyperfold-engine", version = "0.1.0", dependency = "" }
