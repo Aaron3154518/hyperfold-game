@@ -2,6 +2,7 @@ use std::array;
 use std::collections::HashSet;
 use std::hash::Hash;
 
+use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
@@ -18,6 +19,7 @@ use crate::resolve::ast_paths::EngineTraits;
 use crate::resolve::ast_paths::GetPaths;
 use crate::util::Flatten;
 use crate::util::JoinMap;
+use crate::util::JoinMapInto;
 use crate::{
     resolve::ast_paths::ExpandEnum,
     util::{Call, Catch, SplitCollect},
@@ -95,7 +97,7 @@ impl SystemRegexes {
             &l,
             &v_c,
             &v,
-            &format!(r"(?P<name>\w+)\((?P<args>(({arg})(:({arg}))*)?)\)(?P<init>(i)?)"),
+            &format!(r"(?P<name>\w+(::\w+)*)\((?P<args>(({arg})(:({arg}))*)?)\)(?P<init>(i)?)"),
         ]
         .map(|r_str| {
             Regex::new(format!(r"^{r_str}$").as_str())
@@ -114,13 +116,13 @@ impl SystemRegexes {
         }
     }
 
-    pub fn parse_data(&self, sys_str: &str) -> Option<(String, String, bool)> {
+    pub fn parse_data(&self, sys_str: &str) -> Option<(Vec<String>, String, bool)> {
         self.system
             .captures(sys_str)
             .and_then(|c| c.name("name").zip(c.name("args")).zip(c.name("init")))
             .map(|((name, args), init)| {
                 (
-                    name.as_str().to_string(),
+                    name.as_str().split_collect("::"),
                     args.as_str().to_string(),
                     init.as_str() == "i",
                 )
@@ -211,7 +213,7 @@ impl System {
         let (name, args, is_init) = regexes
             .parse_data(data)
             .catch(format!("Could not parse system: {data}"));
-        let name = format_ident!("{name}");
+        let name = vec_to_path(name);
         let mut s = Self {
             name: quote!(#cr_path::#name),
             args: Vec::new(),
@@ -446,7 +448,7 @@ impl System {
                 .iter()
                 .zip(self.v_types[1..].iter())
                 .enumerate()
-                .filter_map(|(i, (a, ty))| match ty {
+                .filter_map(|(mut i, (a, ty))| match ty {
                     ContainerArg::EntityId => None,
                     ContainerArg::Component(_, m) => {
                         let intersect = vec_to_path(
@@ -457,9 +459,10 @@ impl System {
                             }
                             .path_stem(),
                         );
-                        let i = format_ident!("{}", i + 1);
+                        let member: syn::Member = syn::parse_str(format!("{}", i + 1).as_str())
+                            .catch(format!("Could not parse expression: {}", i + 1));
                         Some(quote!(
-                            #engine_crate_path::#intersect(#v, &mut #cfoo.#a, |t| &mut t.#i)
+                            #engine_crate_path::#intersect(#v, &mut #cfoo.#a, |t| &mut t.#member)
                         ))
                     }
                 })

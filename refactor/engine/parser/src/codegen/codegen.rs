@@ -285,14 +285,12 @@ impl Decoder {
 
         let engine_globals = self.get_engine_globals();
         // Paths to engine globals
-        let entity = EngineIdents::Entity.to_path();
-        let entity = quote!(#engine_cr_path::#entity);
-        let gp_entity_trash =
-            engine_globals[EngineGlobals::EntityTrash as usize].call(|(cr_idx, _)| {
-                let path = &crate_paths[*cr_idx];
-                let ident = format_ident!("{}", EngineGlobals::EntityTrash.as_ident());
-                quote!(#path::#ident)
-            });
+        let entity = EngineIdents::Entity
+            .to_path()
+            .call(|i| quote!(#engine_cr_path::#i));
+        let entity_trash = EngineGlobals::EntityTrash
+            .to_path()
+            .call(|i| quote!(#engine_cr_path::#i));
 
         // Component manager
         let add_comp = Idents::AddComponent.to_ident();
@@ -317,7 +315,7 @@ impl Decoder {
                     #(self.#c_vars.extend(cm.#c_vars.drain());)*
                 }
 
-                pub fn remove(&mut self, tr: &mut #gp_entity_trash) {
+                pub fn remove(&mut self, tr: &mut #entity_trash) {
                     for eid in tr.0.drain(..) {
                         self.eids.remove(&eid);
                         #(self.#c_vars.remove(&eid);)*
@@ -346,7 +344,7 @@ impl Decoder {
         let e_len = e_vars.len();
         let e_def = quote!(
             #[derive(Hash, Clone, Copy, Eq, PartialEq, Debug)]
-            enum #e_ident {
+            pub enum #e_ident {
                 #(#e_varis),*
             }
             pub const #e_len_ident: usize = #e_len;
@@ -454,6 +452,9 @@ impl Decoder {
         ]
         .map(|i| vec_to_path(i.path_stem()));
 
+        // Sdl
+        let sdl2 = EngineIdents::SDL2.to_path();
+
         // Systems manager
         let sfoo_ident = Idents::SFoo.to_ident();
         let sfoo_def = quote!(
@@ -498,21 +499,21 @@ impl Decoder {
                     static FPS: u32 = 60;
                     static FRAME_TIME: u32 = 1000 / FPS;
 
-                    let mut t = unsafe { crate::sdl2::SDL_GetTicks() };
+                    let mut t = unsafe { #engine_cr_path::#sdl2::SDL_GetTicks() };
                     let mut dt;
                     let mut tsum: u64 = 0;
                     let mut tcnt: u64 = 0;
                     while !self.#gfoo.#g_event.quit {
-                        dt = unsafe { crate::sdl2::SDL_GetTicks() } - t;
+                        dt = unsafe { #engine_cr_path::#sdl2::SDL_GetTicks() } - t;
                         t += dt;
 
                         self.tick(dt);
 
-                        dt = unsafe { crate::sdl2::SDL_GetTicks() } - t;
+                        dt = unsafe { #engine_cr_path::#sdl2::SDL_GetTicks() } - t;
                         tsum += dt as u64;
                         tcnt += 1;
                         if dt < FRAME_TIME {
-                            unsafe { crate::sdl2::SDL_Delay(FRAME_TIME - dt) };
+                            unsafe { #engine_cr_path::#sdl2::SDL_Delay(FRAME_TIME - dt) };
                         }
                     }
 

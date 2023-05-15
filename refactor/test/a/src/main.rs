@@ -62,5 +62,15 @@ fn vec(
 fn init(t: &dyn crate::_engine::Peepee) {}
 
 fn main() {
+    engine::init_sdl();
+
+    let mut s = _engine::SFoo::new();
+
+    s.run();
+
+    drop(s);
+
+    engine::quit_sdl();
+
     println!("Hello, world!");
 }

@@ -168,6 +168,9 @@ pub enum EngineIdents {
     CoreRender,
     // Entities
     Entity,
+    // Use statements
+    SDL2,
+    SDL2Image,
 }
 
 impl GetPaths<{ Self::LEN }> for EngineIdents {
@@ -187,6 +190,8 @@ impl GetPaths<{ Self::LEN }> for EngineIdents {
             EngineIdents::CoreEvents => "Events",
             EngineIdents::CoreRender => "Render",
             EngineIdents::Entity => "Entity",
+            EngineIdents::SDL2 => "sdl2",
+            EngineIdents::SDL2Image => "sdl2_image",
         }
     }
 
@@ -203,9 +208,10 @@ impl GetPaths<{ Self::LEN }> for EngineIdents {
             | EngineIdents::IntersectKeys
             | EngineIdents::GetKeys => vec!["intersect"],
             EngineIdents::CoreUpdate | EngineIdents::CoreEvents | EngineIdents::CoreRender => {
-                vec!["core_events"]
+                vec![ECS, "events", "core"]
             }
             EngineIdents::Entity => vec![ECS, "entities"],
+            EngineIdents::SDL2 | EngineIdents::SDL2Image => vec![],
         }
     }
 }

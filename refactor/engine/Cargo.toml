@@ -20,4 +20,5 @@ features = [
 ]
 
 [build-dependencies]
+bindgen = "0.65.1"
 parser = { path = "./parser", version = "0.1.0" }
