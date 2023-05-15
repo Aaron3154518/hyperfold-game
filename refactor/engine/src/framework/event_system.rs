@@ -11,7 +11,7 @@ pub mod inputs {
 }
 
 #[macros::system]
-pub fn on_event(_ev: &core::Events, e: &event::Event, events: &mut dyn crate::_engine::Peepee) {
+pub fn on_event(_ev: &core::Events, e: &event::Event, events: &mut dyn crate::_engine::AddEvent) {
     for m in [
         event::Mouse::Left,
         event::Mouse::Right,

@@ -43,7 +43,7 @@ fn comp(
     dc: &c::e::DC,
     sc: Label<T6>,
     re: NorLabels<(a2::a3::a::A, a2::a3::a::A)>,
-    t: &dyn crate::_engine::Peepee,
+    t: &mut dyn crate::_engine::AddComponent,
 ) {
 }
 
@@ -54,17 +54,17 @@ fn vec(
     sc: Label<T6>,
     re: NorLabels<(a2::a3::a::A, a2::a3::a::A)>,
     vc: Container<(&mut T6, &Entity)>,
-    t: &dyn crate::_engine::Peepee,
+    t: &dyn crate::_engine::AddEvent,
 ) {
 }
 
 #[engine::system(Init)]
-fn init(t: &dyn crate::_engine::Peepee) {}
+fn init(t: &dyn crate::_engine::AddEvent) {}
 
 fn main() {
     engine::init_sdl();
 
-    let mut s = _engine::SFoo::new();
+    let mut s = crate::_engine::SFoo::new();
 
     s.run();
 

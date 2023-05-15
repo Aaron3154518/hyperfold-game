@@ -235,10 +235,8 @@ impl NamespaceTraits {
 impl GetPaths<{ Self::LEN }> for NamespaceTraits {
     fn as_ident(&self) -> &str {
         match self {
-            NamespaceTraits::AddComponent => "Poopy",
-            NamespaceTraits::AddEvent => "Peepee",
-            // NamespaceTraits::AddComponent => EngineTraits::AddComponent.as_ident(),
-            // NamespaceTraits::AddEvent => EngineTraits::AddEvent.as_ident(),
+            NamespaceTraits::AddComponent => EngineTraits::AddComponent.as_ident(),
+            NamespaceTraits::AddEvent => EngineTraits::AddEvent.as_ident(),
         }
     }
 
