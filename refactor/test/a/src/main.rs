@@ -29,11 +29,16 @@ pub mod a2;
 pub use a2 as a22;
 
 pub use a2::a3::z::comp as component;
-use engine::{game_crate, Container, Label, NorLabels};
+use engine::{
+    ecs::components::{Container, Label, NorLabels},
+    ecs::entities::Entity,
+    game_crate,
+};
 
 #[engine::system]
 fn comp(
     _e: &crate::t8::X,
+    id: &Entity,
     t6: &T6,
     dc: &c::e::DC,
     sc: Label<T6>,
@@ -48,7 +53,7 @@ fn vec(
     dc: &c::e::DC,
     sc: Label<T6>,
     re: NorLabels<(a2::a3::a::A, a2::a3::a::A)>,
-    vc: Container<(&mut T6, &engine::Entity)>,
+    vc: Container<(&mut T6, &Entity)>,
     t: &dyn crate::_engine::Peepee,
 ) {
 }

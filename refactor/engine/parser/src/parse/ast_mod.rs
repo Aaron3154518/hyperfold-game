@@ -310,8 +310,8 @@ impl Mod {
         path: &mut Vec<String>,
         items: Vec<Symbol>,
     ) -> Vec<Symbol> {
-        i.items
-            .iter()
-            .fold(items, |items, i| self.visit_use_tree(i, path, items))
+        i.items.iter().fold(items, |items, i| {
+            self.visit_use_tree(i, &mut path.to_vec(), items)
+        })
     }
 }

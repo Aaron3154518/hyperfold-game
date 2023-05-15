@@ -390,7 +390,7 @@ impl System {
                 }
             )
         } else {
-            let eid = EngineGlobals::Entity.to_path();
+            let eid = EngineIdents::Entity.to_path();
 
             // Container argument types
             let v_types = self

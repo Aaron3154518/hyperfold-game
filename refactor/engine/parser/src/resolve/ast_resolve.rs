@@ -25,7 +25,7 @@ impl Path {
 // 1) Not from a valid crate
 // 2) resolve_mod() returns Err
 pub fn resolve(mut path: Vec<String>, cr: &Crate, crates: &Vec<Crate>) -> Result<Path, Path> {
-    // println!("Resolve: {}", path.join("::"));
+    // println!("Resolve: {}, crate: {}", path.join("::"), cr.idx);
     let cr_idx = cr.idx;
     match path.first() {
         Some(p) => {
@@ -77,6 +77,7 @@ pub fn resolve_mod(
             path.join("::")
         ))
         .to_string();
+    // println!("Finding: {name}");
     // Check sub modules
     for m in m.mods.iter() {
         if name == *m.path.last().expect("Mod path is empty") {
@@ -90,7 +91,8 @@ pub fn resolve_mod(
         }
     }
     // Check symbols
-    for sym in m.symbols.iter().filter(|sym| sym.public) {
+    // TODO: previously filtered public
+    for sym in m.symbols.iter() {
         if sym.ident == name {
             // println!("Found Symbol: {}", sym.path.join("::"));
             return Ok(Path {

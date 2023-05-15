@@ -220,6 +220,7 @@ impl Decoder {
         // Paths from entry crate to all other crates
         let crate_paths = self.get_crate_paths();
         let crate_paths_post = deps_lrn.map_vec(|i| &crate_paths[*i]);
+        let engine_cr_path = &crate_paths[self.get_engine_crate_index()];
 
         // GEt component types by crate for system codegen
         let mut crate_c_tys = Vec::new();
@@ -284,13 +285,13 @@ impl Decoder {
 
         let engine_globals = self.get_engine_globals();
         // Paths to engine globals
-        let [gp_entity, gp_entity_trash] =
-            [EngineGlobals::Entity, EngineGlobals::EntityTrash].map(|eg| {
-                engine_globals[eg as usize].call(|(cr_idx, _)| {
-                    let path = &crate_paths[*cr_idx];
-                    let ident = format_ident!("{}", eg.as_ident());
-                    quote!(#path::#ident)
-                })
+        let entity = EngineIdents::Entity.to_path();
+        let entity = quote!(#engine_cr_path::#entity);
+        let gp_entity_trash =
+            engine_globals[EngineGlobals::EntityTrash as usize].call(|(cr_idx, _)| {
+                let path = &crate_paths[*cr_idx];
+                let ident = format_ident!("{}", EngineGlobals::EntityTrash.as_ident());
+                quote!(#path::#ident)
             });
 
         // Component manager
@@ -299,8 +300,8 @@ impl Decoder {
         let cfoo_ident = Idents::CFoo.to_ident();
         let cfoo_def = quote!(
             pub struct #cfoo_ident {
-                eids: std::collections::HashSet<#gp_entity>,
-                #(#c_vars: std::collections::HashMap<#gp_entity, #c_tys>,)*
+                eids: std::collections::HashSet<#entity>,
+                #(#c_vars: std::collections::HashMap<#entity, #c_tys>,)*
             }
 
             impl #cfoo_ident {
@@ -327,7 +328,7 @@ impl Decoder {
         let cfoo_traits = quote!(
             #(
                 impl #add_comp_tr<#c_tys> for #cfoo_ident {
-                    fn add_component(&mut self, e: #gp_entity, t: #c_tys) {
+                    fn add_component(&mut self, e: #entity, t: #c_tys) {
                         self.#c_vars.insert(e, t);
                     }
                 }
@@ -423,8 +424,6 @@ impl Decoder {
         let g_camera = &engine_globals[EngineGlobals::Camera as usize];
         let g_efoo = &engine_globals[EngineGlobals::EFoo as usize];
         let g_cfoo = &engine_globals[EngineGlobals::CFoo as usize];
-
-        let engine_cr_path = &crate_paths[self.get_engine_crate_index()];
 
         // Systems
         let systems =

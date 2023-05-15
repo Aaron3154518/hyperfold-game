@@ -101,7 +101,7 @@ impl SystemValidate {
 impl FnArg {
     // Convert to data
     fn to_eid(&self, paths: &Paths) -> Option<()> {
-        matches!(&self.ty, FnArgType::Path(p) if p == paths.get_global(EngineGlobals::Entity))
+        matches!(&self.ty, FnArgType::Path(p) if p == paths.get_ident(EngineIdents::Entity))
             .then_some(())
     }
 
@@ -151,13 +151,13 @@ impl FnArg {
     fn to_label(&self, paths: &Paths) -> Option<(&str, Vec<&FnArg>)> {
         match &self.ty {
             FnArgType::SContainer(p, a) => {
-                (p == paths.get_container(EngineIdents::Label)).then(|| ("&", vec![&**a]))
+                (p == paths.get_ident(EngineIdents::Label)).then(|| ("&", vec![&**a]))
             }
-            FnArgType::Container(p, v) => (p == paths.get_container(EngineIdents::AndLabels))
+            FnArgType::Container(p, v) => (p == paths.get_ident(EngineIdents::AndLabels))
                 .then_some("&")
-                .or_else(|| (p == paths.get_container(EngineIdents::OrLabels)).then_some("|"))
-                .or_else(|| (p == paths.get_container(EngineIdents::NandLabels)).then_some("|&"))
-                .or_else(|| (p == paths.get_container(EngineIdents::NorLabels)).then_some("!|"))
+                .or_else(|| (p == paths.get_ident(EngineIdents::OrLabels)).then_some("|"))
+                .or_else(|| (p == paths.get_ident(EngineIdents::NandLabels)).then_some("|&"))
+                .or_else(|| (p == paths.get_ident(EngineIdents::NorLabels)).then_some("!|"))
                 .map(|l_ty| (l_ty, v.iter().collect())),
             _ => None,
         }
@@ -166,7 +166,7 @@ impl FnArg {
     fn to_container(&self, paths: &Paths) -> Option<Vec<&FnArg>> {
         match &self.ty {
             FnArgType::Container(p, v) => {
-                (p == paths.get_container(EngineIdents::Container)).then_some(v.iter().collect())
+                (p == paths.get_ident(EngineIdents::Container)).then_some(v.iter().collect())
             }
             _ => None,
         }

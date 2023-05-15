@@ -55,6 +55,9 @@ pub trait GetPaths<const N: usize>: ExpandEnum<N> {
     }
 }
 
+// Constants for defining paths
+pub const ECS: &str = "ecs";
+
 // Paths to marker macros
 #[shared::macros::expand_enum]
 pub enum MacroPaths {
@@ -89,6 +92,13 @@ impl GetPaths<{ Self::LEN }> for EngineTraits {
             EngineTraits::AddEvent => "AddEvent",
         }
     }
+
+    fn as_path(&self) -> Vec<&str> {
+        match self {
+            EngineTraits::AddComponent => vec![ECS, "components"],
+            EngineTraits::AddEvent => vec![ECS, "events"],
+        }
+    }
 }
 
 // Paths to globals needed by codegen
@@ -96,7 +106,6 @@ impl GetPaths<{ Self::LEN }> for EngineTraits {
 pub enum EngineGlobals {
     CFoo,
     EFoo,
-    Entity,
     EntityTrash,
     Event,
     RenderSystem,
@@ -109,7 +118,6 @@ impl GetPaths<{ Self::LEN }> for EngineGlobals {
         match self {
             EngineGlobals::CFoo => "CFoo",
             EngineGlobals::EFoo => "EFoo",
-            EngineGlobals::Entity => "Entity",
             EngineGlobals::EntityTrash => "EntityTrash",
             EngineGlobals::Event => "Event",
             EngineGlobals::RenderSystem => "RenderSystem",
@@ -121,7 +129,11 @@ impl GetPaths<{ Self::LEN }> for EngineGlobals {
     fn as_path(&self) -> Vec<&str> {
         match self {
             EngineGlobals::CFoo | EngineGlobals::EFoo => vec![NAMESPACE],
-            _ => Vec::new(),
+            EngineGlobals::EntityTrash => vec![ECS, "entities"],
+            EngineGlobals::RenderSystem | EngineGlobals::Screen | EngineGlobals::Camera => {
+                vec!["framework", "render_system"]
+            }
+            EngineGlobals::Event => vec!["utils", "event"],
         }
     }
 
@@ -154,6 +166,8 @@ pub enum EngineIdents {
     CoreUpdate,
     CoreEvents,
     CoreRender,
+    // Entities
+    Entity,
 }
 
 impl GetPaths<{ Self::LEN }> for EngineIdents {
@@ -172,6 +186,7 @@ impl GetPaths<{ Self::LEN }> for EngineIdents {
             EngineIdents::CoreUpdate => "Update",
             EngineIdents::CoreEvents => "Events",
             EngineIdents::CoreRender => "Render",
+            EngineIdents::Entity => "Entity",
         }
     }
 
@@ -182,7 +197,7 @@ impl GetPaths<{ Self::LEN }> for EngineIdents {
             | EngineIdents::AndLabels
             | EngineIdents::OrLabels
             | EngineIdents::NandLabels
-            | EngineIdents::NorLabels => vec![],
+            | EngineIdents::NorLabels => vec![ECS, "components"],
             EngineIdents::Intersect
             | EngineIdents::IntersectMut
             | EngineIdents::IntersectKeys
@@ -190,6 +205,7 @@ impl GetPaths<{ Self::LEN }> for EngineIdents {
             EngineIdents::CoreUpdate | EngineIdents::CoreEvents | EngineIdents::CoreRender => {
                 vec!["core_events"]
             }
+            EngineIdents::Entity => vec![ECS, "entities"],
         }
     }
 }
@@ -257,7 +273,7 @@ impl Paths {
         &self.globals[i as usize]
     }
 
-    pub fn get_container(&self, i: EngineIdents) -> &Path {
+    pub fn get_ident(&self, i: EngineIdents) -> &Path {
         &self.idents[i as usize]
     }
 }
