@@ -24,7 +24,7 @@ fn init_wizard(
         entities,
         e,
         render_system::Elevation(1),
-        render_system::Image(rs.get_image("res/wizards/wizard.png")),
+        render_system::Image::from(rs.get_image("res/wizards/wizard.png")),
         physics::Position(Rect {
             x: camera.0.cx() - 50.0,
             y: camera.0.cy() - 150.0,

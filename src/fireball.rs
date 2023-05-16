@@ -28,7 +28,7 @@ pub fn new_fireball(
         entities,
         e,
         render_system::Elevation(0),
-        render_system::Image(rs.get_image("res/projectiles/fireball.png")),
+        render_system::Image::from(rs.get_image("res/projectiles/fireball.png")),
         physics::Position(Rect {
             x: pos.x - 25.0,
             y: pos.y - 25.0,
