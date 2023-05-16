@@ -3,10 +3,15 @@ use hyperfold_engine::ecs::entities::{Entity, NewEntity};
 use hyperfold_engine::ecs::events::core;
 use hyperfold_engine::framework::{event_system, physics, render_system};
 use hyperfold_engine::sdl2::SDL_KeyCode::*;
-use hyperfold_engine::utils::rect::{Align, Rect};
+use hyperfold_engine::utils::rect::{Align, PointF, Rect};
+
+use crate::fireball::new_fireball;
 
 #[hyperfold_engine::component]
 struct Wizard;
+
+#[hyperfold_engine::component]
+struct Timer(i32);
 
 #[hyperfold_engine::system(Init)]
 fn init_wizard(
@@ -27,6 +32,7 @@ fn init_wizard(
             h: 100.0,
         }),
         physics::PhysicsData::new(),
+        Timer(1000),
         Wizard
     );
 }
@@ -59,5 +65,30 @@ fn move_keys(ev: &event_system::inputs::Key, pd: &mut physics::PhysicsData, _l: 
         if ev.0.up() {
             *val -= amnt;
         }
+    }
+}
+
+#[hyperfold_engine::system]
+fn update(
+    ev: &core::Update,
+    timer: &mut Timer,
+    pos: &physics::Position,
+    entities: &mut dyn crate::_engine::AddComponent,
+    rs: &mut render_system::RenderSystem,
+    screen: &render_system::Screen,
+    _l: Label<Wizard>,
+) {
+    timer.0 -= ev.0 as i32;
+    while timer.0 <= 0 {
+        timer.0 += 1000;
+        new_fireball(
+            entities,
+            rs,
+            pos.0.center(),
+            PointF {
+                x: screen.0.w as f32 / 2.0,
+                y: screen.0.h as f32 / 2.0,
+            },
+        );
     }
 }

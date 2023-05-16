@@ -1,4 +1,5 @@
 mod crystal;
+mod fireball;
 mod wizard;
 
 hyperfold_engine::game_crate!();
