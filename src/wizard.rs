@@ -23,7 +23,7 @@ fn init_wizard(
     hyperfold_engine::add_components!(
         entities,
         e,
-        render_system::Elevation(1),
+        render_system::Elevation(2),
         render_system::Image::from(rs.get_image("res/wizards/wizard.png")),
         physics::Position(Rect {
             x: camera.0.cx() - 50.0,

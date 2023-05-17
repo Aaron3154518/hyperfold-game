@@ -2,12 +2,12 @@ use hyperfold_engine::{
     ecs::entities::{Entity, NewEntity},
     framework::{
         physics, render_system,
-        shapes::{Rectangle, ShapeTrait},
+        shapes::{Circle, Rectangle, ShapeTrait},
         texture_builder::TextureBuilder,
     },
     utils::{
-        colors::{BLUE, MAGENTA},
-        rect::Rect,
+        colors::{BLUE, GREEN, MAGENTA},
+        rect::{Point, Rect},
     },
 };
 
@@ -40,12 +40,26 @@ fn init_crystal(
                 h: 40.0,
             }),
     );
+    tb.draw(
+        Circle::new()
+            .set_color(GREEN)
+            .set_boundary(Rect {
+                x: 0.0,
+                y: 5.0,
+                w: 95.0,
+                h: 95.0,
+            })
+            .set_center(Point { x: 85, y: 15 })
+            .border(13, 3, true)
+            .dashed(20)
+            .set_angle_deg(180.0, 45.0),
+    );
 
     let e = Entity::new();
     hyperfold_engine::add_components!(
         entities,
         e,
-        render_system::Elevation(0),
+        render_system::Elevation(1),
         render_system::Image::from(tex),
         // render_system::Image(rs.get_image("res/wizards/crystal.png")),
         physics::Position(Rect {
