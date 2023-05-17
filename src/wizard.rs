@@ -1,6 +1,8 @@
 use hyperfold_engine::ecs::components::Label;
 use hyperfold_engine::ecs::entities::{Entity, NewEntity};
 use hyperfold_engine::ecs::events::core;
+use hyperfold_engine::framework::font::{FontData, TIMES};
+use hyperfold_engine::framework::text::render_text;
 use hyperfold_engine::framework::{event_system, physics, render_system};
 use hyperfold_engine::sdl2::SDL_KeyCode::*;
 use hyperfold_engine::utils::rect::{Align, PointF, Rect};
@@ -19,12 +21,37 @@ fn init_wizard(
     rs: &mut render_system::RenderSystem,
     camera: &render_system::Camera,
 ) {
+    let font = rs
+        .am
+        .get_font(FontData {
+            w: Some(100),
+            h: Some(50),
+            sample: "World".to_string(),
+            file: TIMES.to_string(),
+        })
+        .expect("Could not create font");
+
+    let tex = render_text(
+        rs.r.access(),
+        "Hello\nWorld",
+        &font,
+        Rect {
+            x: 0.0,
+            y: 0.0,
+            w: 100.0,
+            h: 25.0,
+        },
+        Align::Center,
+        Align::Center,
+    );
+
     let e = Entity::new();
     hyperfold_engine::add_components!(
         entities,
         e,
         render_system::Elevation(2),
-        render_system::Image::from(rs.get_image("res/wizards/wizard.png")),
+        render_system::Image::from(tex),
+        // render_system::Image::from(rs.get_image("res/wizards/wizard.png")),
         physics::Position(Rect {
             x: camera.0.cx() - 50.0,
             y: camera.0.cy() - 150.0,
