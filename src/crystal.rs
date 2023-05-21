@@ -2,8 +2,11 @@ use hyperfold_engine::{
     ecs::entities::{Entity, NewEntity},
     framework::{
         physics,
-        render_system::{self, Renderer, Texture},
-        shapes::{Circle, Rectangle, ShapeTrait},
+        render_system::{
+            self,
+            shapes::{Circle, Rectangle, ShapeTrait},
+            Renderer, Texture,
+        },
     },
     utils::{
         colors::{BLUE, GREEN, MAGENTA},

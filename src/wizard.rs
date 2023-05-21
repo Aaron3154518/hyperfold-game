@@ -5,11 +5,13 @@ use hyperfold_engine::{
         events::core,
     },
     framework::{
-        event_system,
-        font::{FontData, TIMES},
-        physics,
-        render_system::{self, AssetManager, Renderer},
-        text::render_text,
+        event_system, physics,
+        render_system::{
+            self,
+            font::{FontData, TIMES},
+            text::render_text,
+            AssetManager, Renderer,
+        },
     },
     sdl2::SDL_KeyCode::*,
     utils::rect::{Align, PointF, Rect},
