@@ -11,12 +11,7 @@ use hyperfold_engine::{
 #[hyperfold_engine::component]
 struct Fireball;
 
-pub fn new_fireball(
-    entities: &mut dyn crate::_engine::AddComponent,
-    rs: &mut render_system::RenderSystem,
-    pos: PointF,
-    target: PointF,
-) {
+pub fn new_fireball(entities: &mut dyn crate::_engine::AddComponent, pos: PointF, target: PointF) {
     let e = Entity::new();
     let (mut dx, mut dy) = (target.x - pos.x, target.y - pos.y);
     let mag = (dx * dx + dy * dy).sqrt();
@@ -28,7 +23,7 @@ pub fn new_fireball(
         entities,
         e,
         render_system::Elevation(0),
-        render_system::Image::from(rs.get_image("res/projectiles/fireball.png")),
+        render_system::Image::from_file("res/projectiles/fireball.png".to_string()),
         physics::Position(Rect {
             x: pos.x - 25.0,
             y: pos.y - 25.0,

@@ -1,11 +1,19 @@
-use hyperfold_engine::ecs::components::Label;
-use hyperfold_engine::ecs::entities::{Entity, NewEntity};
-use hyperfold_engine::ecs::events::core;
-use hyperfold_engine::framework::font::{FontData, TIMES};
-use hyperfold_engine::framework::text::render_text;
-use hyperfold_engine::framework::{event_system, physics, render_system};
-use hyperfold_engine::sdl2::SDL_KeyCode::*;
-use hyperfold_engine::utils::rect::{Align, PointF, Rect};
+use hyperfold_engine::{
+    ecs::{
+        components::Label,
+        entities::{Entity, NewEntity},
+        events::core,
+    },
+    framework::{
+        event_system,
+        font::{FontData, TIMES},
+        physics,
+        render_system::{self, AssetManager, Renderer},
+        text::render_text,
+    },
+    sdl2::SDL_KeyCode::*,
+    utils::rect::{Align, PointF, Rect},
+};
 
 use crate::fireball::new_fireball;
 
@@ -18,23 +26,20 @@ struct Timer(i32);
 #[hyperfold_engine::system(Init)]
 fn init_wizard(
     entities: &mut dyn crate::_engine::AddComponent,
-    rs: &mut render_system::RenderSystem,
+    r: &Renderer,
+    am: &mut AssetManager,
     camera: &render_system::Camera,
 ) {
-    let font = rs
-        .am
-        .get_font(FontData {
+    let tex = render_text(
+        r,
+        am,
+        "Hello\nWorld",
+        FontData {
             w: Some(100),
             h: Some(50),
             sample: "World".to_string(),
             file: TIMES.to_string(),
-        })
-        .expect("Could not create font");
-
-    let tex = render_text(
-        rs.r.access(),
-        "Hello\nWorld",
-        &font,
+        },
         Rect {
             x: 0.0,
             y: 0.0,
@@ -50,7 +55,7 @@ fn init_wizard(
         entities,
         e,
         render_system::Elevation(2),
-        render_system::Image::from(tex),
+        render_system::Image::from_texture(tex),
         // render_system::Image::from(rs.get_image("res/wizards/wizard.png")),
         physics::Position(Rect {
             x: camera.0.cx() - 50.0,
@@ -101,7 +106,6 @@ fn update(
     timer: &mut Timer,
     pos: &physics::Position,
     entities: &mut dyn crate::_engine::AddComponent,
-    rs: &mut render_system::RenderSystem,
     screen: &render_system::Screen,
     _l: Label<Wizard>,
 ) {
@@ -110,7 +114,6 @@ fn update(
         timer.0 += 1000;
         new_fireball(
             entities,
-            rs,
             pos.0.center(),
             PointF {
                 x: screen.0.w as f32 / 2.0,
