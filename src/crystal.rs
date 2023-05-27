@@ -4,6 +4,7 @@ use hyperfold_engine::{
         physics,
         render_system::{
             self,
+            render_data::RenderDataTrait,
             shapes::{Circle, Rectangle, ShapeTrait},
             Renderer, Texture,
         },
@@ -18,12 +19,12 @@ use hyperfold_engine::{
 fn init_crystal(
     entities: &mut dyn crate::_engine::AddComponent,
     r: &Renderer,
-    camera: &render_system::Camera,
+    screen: &render_system::Screen,
 ) {
     let tex = Texture::new(r, 100, 100, MAGENTA);
     tex.draw(
         r,
-        Rectangle::new()
+        &Rectangle::new()
             .set_color(BLUE)
             .set_boundary(Rect {
                 x: 5.0,
@@ -46,7 +47,7 @@ fn init_crystal(
     );
     tex.draw(
         r,
-        Circle::new()
+        &Circle::new()
             .set_color(GREEN)
             .set_boundary(Rect {
                 x: 0.0,
@@ -65,11 +66,11 @@ fn init_crystal(
         entities,
         e,
         render_system::Elevation(1),
-        render_system::Image::from_texture(tex),
+        render_system::RenderComponent::from_texture(tex),
         // render_system::Image(rs.get_image("res/wizards/crystal.png")),
         physics::Position(Rect {
-            x: camera.0.cx() - 50.0,
-            y: camera.0.cy() - 50.0,
+            x: screen.0.w as f32 / 2.0 - 50.0,
+            y: screen.0.h as f32 / 2.0 - 50.0,
             w: 100.0,
             h: 100.0,
         }),

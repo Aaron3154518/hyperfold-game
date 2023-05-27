@@ -4,16 +4,31 @@ use hyperfold_engine::{
         entities::{Entity, EntityTrash, NewEntity},
         events,
     },
-    framework::{physics, render_system},
+    framework::{
+        physics,
+        render_system::{self, AssetManager, Renderer},
+    },
     utils::rect::{PointF, Rect},
 };
 
 #[hyperfold_engine::component]
 struct Fireball;
 
-pub fn new_fireball(entities: &mut dyn crate::_engine::AddComponent, pos: PointF, target: PointF) {
+#[hyperfold_engine::event]
+struct CreateFireball {
+    pub pos: PointF,
+    pub target: PointF,
+}
+
+#[hyperfold_engine::system]
+pub fn new_fireball(
+    data: &CreateFireball,
+    entities: &mut dyn crate::_engine::AddComponent,
+    r: &Renderer,
+    am: &mut AssetManager,
+) {
     let e = Entity::new();
-    let (mut dx, mut dy) = (target.x - pos.x, target.y - pos.y);
+    let (mut dx, mut dy) = (data.target.x - data.pos.x, data.target.y - data.pos.y);
     let mag = (dx * dx + dy * dy).sqrt();
     if mag > 0.0 {
         dx *= 150.0 / mag;
@@ -23,10 +38,14 @@ pub fn new_fireball(entities: &mut dyn crate::_engine::AddComponent, pos: PointF
         entities,
         e,
         render_system::Elevation(0),
-        render_system::Image::from_file("res/projectiles/fireball.png".to_string()),
+        render_system::RenderComponent::from_file(
+            "res/projectiles/fireball.png".to_string(),
+            r,
+            am
+        ),
         physics::Position(Rect {
-            x: pos.x - 25.0,
-            y: pos.y - 25.0,
+            x: data.pos.x - 25.0,
+            y: data.pos.y - 25.0,
             w: 50.0,
             h: 50.0,
         }),

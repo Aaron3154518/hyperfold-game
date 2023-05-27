@@ -8,8 +8,7 @@ use hyperfold_engine::{
         event_system, physics,
         render_system::{
             self,
-            font::{FontData, TIMES},
-            text::render_text,
+            render_data::{Animation, RenderDataTrait},
             AssetManager, Renderer,
         },
     },
@@ -17,7 +16,7 @@ use hyperfold_engine::{
     utils::rect::{Align, PointF, Rect},
 };
 
-use crate::fireball::new_fireball;
+use crate::fireball::CreateFireball;
 
 #[hyperfold_engine::component]
 struct Wizard;
@@ -32,33 +31,15 @@ fn init_wizard(
     am: &mut AssetManager,
     camera: &render_system::Camera,
 ) {
-    let tex = render_text(
-        r,
-        am,
-        "Hello\nWorld",
-        FontData {
-            w: Some(100),
-            h: Some(50),
-            sample: "World".to_string(),
-            file: TIMES.to_string(),
-        },
-        Rect {
-            x: 0.0,
-            y: 0.0,
-            w: 100.0,
-            h: 25.0,
-        },
-        Align::Center,
-        Align::Center,
-    );
-
     let e = Entity::new();
+    let rc =
+        render_system::RenderComponent::from_file("res/wizards/wizard_ss.png".to_string(), r, am)
+            .animate(entities, e, Animation::new(5, 150));
     hyperfold_engine::add_components!(
         entities,
         e,
         render_system::Elevation(2),
-        render_system::Image::from_texture(tex),
-        // render_system::Image::from(rs.get_image("res/wizards/wizard.png")),
+        rc,
         physics::Position(Rect {
             x: camera.0.cx() - 50.0,
             y: camera.0.cy() - 150.0,
@@ -107,20 +88,19 @@ fn update(
     ev: &core::Update,
     timer: &mut Timer,
     pos: &physics::Position,
-    entities: &mut dyn crate::_engine::AddComponent,
+    events: &mut dyn crate::_engine::AddEvent,
     screen: &render_system::Screen,
     _l: Label<Wizard>,
 ) {
     timer.0 -= ev.0 as i32;
     while timer.0 <= 0 {
         timer.0 += 1000;
-        new_fireball(
-            entities,
-            pos.0.center(),
-            PointF {
+        events.new_event(CreateFireball {
+            pos: pos.0.center(),
+            target: PointF {
                 x: screen.0.w as f32 / 2.0,
                 y: screen.0.h as f32 / 2.0,
             },
-        );
+        });
     }
 }

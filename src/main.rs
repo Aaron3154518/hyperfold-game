@@ -1,5 +1,8 @@
+#![feature(trait_upcasting)]
+
 mod crystal;
 mod fireball;
+mod text_wizard;
 mod wizard;
 
 hyperfold_engine::game_crate!();
