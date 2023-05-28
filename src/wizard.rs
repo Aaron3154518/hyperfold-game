@@ -8,7 +8,7 @@ use hyperfold_engine::{
         event_system, physics,
         render_system::{
             self,
-            render_data::{Animation, RenderDataTrait},
+            render_data::{Animation, RenderAsset, RenderDataBuilderTrait},
             AssetManager, Renderer,
         },
     },
@@ -32,9 +32,13 @@ fn init_wizard(
     camera: &render_system::Camera,
 ) {
     let e = Entity::new();
-    let rc =
-        render_system::RenderComponent::from_file("res/wizards/wizard_ss.png".to_string(), r, am)
-            .animate(entities, e, Animation::new(5, 150));
+    let rc = render_system::RenderComponent::new(
+        RenderAsset::from_file("res/wizards/wizard_ss.png".to_string(), r, am).with_animation(
+            entities,
+            e,
+            Animation::new(5, 150),
+        ),
+    );
     hyperfold_engine::add_components!(
         entities,
         e,

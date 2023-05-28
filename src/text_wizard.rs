@@ -2,7 +2,7 @@ use std::f32::consts::{PI, TAU};
 
 use hyperfold_engine::{
     ecs::{
-        components::Label,
+        components::{AddComponent, Label},
         entities::{Entity, NewEntity},
         events::core::Update,
     },
@@ -11,8 +11,9 @@ use hyperfold_engine::{
         render_system::{
             self,
             font::{FontData, TIMES},
-            text::render_text,
-            AssetManager, Renderer,
+            render_data::{Animation, FitMode, RenderAsset, RenderDataBuilderTrait},
+            render_text::{RenderText, TextImage},
+            AssetManager, RenderComponent, Renderer,
         },
     },
     utils::rect::{Align, PointF, Rect},
@@ -33,32 +34,37 @@ fn init_text_wizard(
     r: &Renderer,
     am: &mut AssetManager,
 ) {
-    let tex = render_text(
-        r,
-        am,
-        "Hello\nWorld",
-        FontData {
-            w: Some(100),
-            h: Some(50),
-            sample: "World".to_string(),
-            file: TIMES.to_string(),
-        },
-        Rect {
-            x: 0.0,
-            y: 0.0,
-            w: 100.0,
-            h: 25.0,
-        },
-        Align::Center,
-        Align::Center,
+    let anim_e = Entity::new();
+    let anim = RenderComponent::new(
+        RenderAsset::from_file("res/wizards/power_wizard_ss.png".to_string(), r, am)
+            .with_animation(entities, anim_e, Animation::new(8, 100)),
     );
+    entities.add_component(anim_e, anim);
 
     let e = Entity::new();
     hyperfold_engine::add_components!(
         entities,
         e,
         render_system::Elevation(2),
-        render_system::RenderComponent::from_texture(tex),
+        RenderComponent::new(
+            RenderText::new(FontData {
+                w: Some(100),
+                h: Some(50),
+                sample: "World".to_string(),
+                file: TIMES.to_string(),
+            })
+            .with_text("Hello{i}{i}World".to_string())
+            .with_text_align(Align::Center, Align::Center)
+            .with_dest_fit(FitMode::FitWithin(Align::Center, Align::Center))
+            .with_images(vec![
+                TextImage::Render(RenderComponent::new(RenderAsset::from_file(
+                    "res/projectiles/fireball2.png".to_string(),
+                    r,
+                    am
+                ))),
+                TextImage::Reference(anim_e)
+            ])
+        ),
         Position(Rect {
             x: 0.0,
             y: 0.0,

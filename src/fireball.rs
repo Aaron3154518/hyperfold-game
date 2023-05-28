@@ -6,7 +6,7 @@ use hyperfold_engine::{
     },
     framework::{
         physics,
-        render_system::{self, AssetManager, Renderer},
+        render_system::{self, render_data::RenderAsset, AssetManager, Renderer},
     },
     utils::rect::{PointF, Rect},
 };
@@ -38,11 +38,11 @@ pub fn new_fireball(
         entities,
         e,
         render_system::Elevation(0),
-        render_system::RenderComponent::from_file(
+        render_system::RenderComponent::new(RenderAsset::from_file(
             "res/projectiles/fireball.png".to_string(),
             r,
             am
-        ),
+        )),
         physics::Position(Rect {
             x: data.pos.x - 25.0,
             y: data.pos.y - 25.0,
