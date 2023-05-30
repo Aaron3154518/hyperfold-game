@@ -2,7 +2,7 @@ use std::f32::consts::{PI, TAU};
 
 use hyperfold_engine::{
     ecs::{
-        components::{AddComponent, Label},
+        components::Label,
         entities::{Entity, NewEntity},
         events::core::Update,
     },
@@ -16,7 +16,10 @@ use hyperfold_engine::{
             AssetManager, RenderComponent, Renderer,
         },
     },
-    utils::rect::{Align, PointF, Rect},
+    utils::{
+        colors::{TRANSPARENT, WHITE},
+        rect::{Align, PointF, Rect},
+    },
 };
 
 #[hyperfold_engine::component]
@@ -35,11 +38,12 @@ fn init_text_wizard(
     am: &mut AssetManager,
 ) {
     let anim_e = Entity::new();
+
     let anim = RenderComponent::new(
         RenderAsset::from_file("res/wizards/power_wizard_ss.png".to_string(), r, am)
             .with_animation(entities, anim_e, Animation::new(8, 100)),
     );
-    entities.add_component(anim_e, anim);
+    hyperfold_engine::add_components!(entities, anim_e, anim, Position(Rect::new()));
 
     let e = Entity::new();
     hyperfold_engine::add_components!(
@@ -64,6 +68,8 @@ fn init_text_wizard(
                 ))),
                 TextImage::Reference(anim_e)
             ])
+            .with_text_color(WHITE)
+            .with_background_color(TRANSPARENT)
         ),
         Position(Rect {
             x: 0.0,
@@ -87,7 +93,7 @@ fn rotate_text_wizard(
     rot: &mut Rotation,
     _l: Label<TextWizard>,
 ) {
-    rot.theta = (rot.theta + update.0 as f32 * PI / 3000.0) % TAU;
+    rot.theta = (rot.theta + update.0 as f32 * PI / 5000.0) % TAU;
     let c = PointF {
         x: screen.0.w as f32 / 2.0,
         y: screen.0.h as f32 / 2.0,

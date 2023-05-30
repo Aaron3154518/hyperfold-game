@@ -4,6 +4,7 @@ use hyperfold_engine::{
         physics,
         render_system::{
             self,
+            drawable::Canvas,
             render_data::RenderTexture,
             shapes::{Circle, Rectangle, ShapeTrait},
             Renderer, Texture,
