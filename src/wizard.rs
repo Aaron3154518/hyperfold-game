@@ -18,7 +18,7 @@ use hyperfold_engine::{
 
 use crate::fireball::CreateFireball;
 
-#[hyperfold_engine::component]
+#[hyperfold_engine::component(Singleton)]
 struct Wizard;
 
 #[hyperfold_engine::component]
