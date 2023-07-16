@@ -2,7 +2,6 @@ use std::f32::consts::{PI, TAU};
 
 use hyperfold_engine::{
     ecs::{
-        components::Label,
         entities::{Entity, NewEntity},
         events::core::Update,
     },
@@ -85,13 +84,18 @@ fn init_text_wizard(
     );
 }
 
+hyperfold_engine::components!(
+    labels(TextWizard),
+    RotateTextWizard,
+    pos: &'a mut Position,
+    rot: &'a mut Rotation,
+);
+
 #[hyperfold_engine::system]
 fn rotate_text_wizard(
     update: &Update,
-    pos: &mut Position,
     screen: &render_system::Screen,
-    rot: &mut Rotation,
-    _l: Label<TextWizard>,
+    RotateTextWizard { pos, rot, .. }: RotateTextWizard,
 ) {
     rot.theta = (rot.theta + update.0 as f32 * PI / 5000.0) % TAU;
     let c = PointF {

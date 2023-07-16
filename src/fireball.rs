@@ -1,8 +1,8 @@
 use hyperfold_engine::{
     ecs::{
-        components::Label,
         entities::{Entity, EntityTrash, NewEntity},
         events,
+        systems::Entities,
     },
     framework::{
         physics,
@@ -58,16 +58,18 @@ pub fn new_fireball(
     );
 }
 
+hyperfold_engine::components!(labels(Fireball), UpdateFireball, pos: &'a physics::Position,);
+
 #[hyperfold_engine::system]
 fn update_fireball(
     _e: &events::core::Update,
-    eid: &Entity,
-    pos: &physics::Position,
     camera: &render_system::Camera,
     trash: &mut EntityTrash,
-    _l: Label<Fireball>,
+    fballs: Entities<UpdateFireball>,
 ) {
-    if !pos.0.intersects(&camera.0) {
-        trash.0.push(*eid)
+    for UpdateFireball { eid, pos } in fballs {
+        if !pos.0.intersects(&camera.0) {
+            trash.0.push(*eid)
+        }
     }
 }

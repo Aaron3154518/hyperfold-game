@@ -1,6 +1,5 @@
 use hyperfold_engine::{
     ecs::{
-        components::Label,
         entities::{Entity, NewEntity},
         events::core,
     },
@@ -56,12 +55,19 @@ fn init_wizard(
     );
 }
 
+hyperfold_engine::components!(
+    labels(Wizard),
+    WizardData,
+    pos: &'a physics::Position,
+    pd: &'a mut physics::PhysicsData,
+    timer: &'a mut Timer,
+);
+
 #[hyperfold_engine::system]
 fn track_wizard(
     _ev: &core::Update,
-    pos: &physics::Position,
     camera: &mut render_system::Camera,
-    _l: Label<Wizard>,
+    WizardData { pos, .. }: WizardData,
 ) {
     camera
         .0
@@ -69,7 +75,7 @@ fn track_wizard(
 }
 
 #[hyperfold_engine::system]
-fn move_keys(ev: &event_system::inputs::Key, pd: &mut physics::PhysicsData, _l: Label<Wizard>) {
+fn move_keys(ev: &event_system::inputs::Key, WizardData { pd, .. }: WizardData) {
     const V: f32 = 250.0;
     if let Some((val, amnt)) = match ev.0.key {
         SDLK_a => Some((&mut pd.v.x, -V)),
@@ -90,11 +96,9 @@ fn move_keys(ev: &event_system::inputs::Key, pd: &mut physics::PhysicsData, _l: 
 #[hyperfold_engine::system]
 fn update(
     ev: &core::Update,
-    timer: &mut Timer,
-    pos: &physics::Position,
     events: &mut dyn crate::_engine::AddEvent,
     screen: &render_system::Screen,
-    _l: Label<Wizard>,
+    WizardData { timer, pos, .. }: WizardData,
 ) {
     timer.0 -= ev.0 as i32;
     while timer.0 <= 0 {
