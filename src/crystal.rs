@@ -10,9 +10,10 @@ use hyperfold_engine::{
             Renderer, Texture,
         },
     },
+    sdl2::SDL_Color,
     utils::{
-        colors::{BLUE, GREEN, MAGENTA},
-        rect::{Point, Rect},
+        colors::{BLUE, GREEN, MAGENTA, RED, TRANSPARENT},
+        rect::{Align, Point, Rect},
     },
 };
 
@@ -67,6 +68,9 @@ fn init_crystal(
             .set_angle_deg(180.0, 45.0),
     );
 
+    let cx = screen.0.w as f32 / 2.0;
+    let cy = screen.0.h as f32 / 2.0;
+
     let e = Entity::new();
     hyperfold_engine::add_components!(
         entities,
@@ -74,12 +78,44 @@ fn init_crystal(
         render_system::Elevation(1),
         render_system::RenderComponent::new(RenderTexture::new(Some(tex))),
         // render_system::Image(rs.get_image("res/wizards/crystal.png")),
-        physics::Position(Rect {
-            x: screen.0.w as f32 / 2.0 - 50.0,
-            y: screen.0.h as f32 / 2.0 - 50.0,
-            w: 100.0,
-            h: 100.0,
-        }),
+        physics::Position(Rect::from(
+            cx,
+            cy,
+            100.0,
+            100.0,
+            Align::Center,
+            Align::Center
+        )),
         Crystal
+    );
+
+    let w = screen.0.w.min(screen.0.h);
+    let tex = Texture::new(r, w, w, TRANSPARENT);
+    tex.draw(
+        r,
+        &mut Circle::new()
+            .set_color(RED)
+            .set_center(Point {
+                x: w as i32 / 2,
+                y: w as i32 / 2,
+            })
+            .border(w / 2, -3, false)
+            .dashed(20),
+    );
+
+    let e = Entity::new();
+    hyperfold_engine::add_components!(
+        entities,
+        e,
+        render_system::Elevation(0),
+        render_system::RenderComponent::new(RenderTexture::new(Some(tex))),
+        physics::Position(Rect::from(
+            cx,
+            cy,
+            w as f32,
+            w as f32,
+            Align::Center,
+            Align::Center
+        ))
     );
 }
