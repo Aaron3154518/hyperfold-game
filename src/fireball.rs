@@ -2,7 +2,6 @@ use hyperfold_engine::{
     ecs::{
         entities::{Entity, EntityTrash, NewEntity},
         events,
-        systems::Entities,
     },
     framework::{
         physics,
@@ -65,7 +64,7 @@ fn update_fireball(
     _e: &events::core::Update,
     camera: &render_system::Camera,
     trash: &mut EntityTrash,
-    fballs: Entities<UpdateFireball>,
+    fballs: Vec<UpdateFireball>,
 ) {
     for UpdateFireball { eid, pos } in fballs {
         if !pos.0.intersects(&camera.0) {

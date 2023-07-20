@@ -15,7 +15,10 @@ use hyperfold_engine::{
     utils::rect::{Align, PointF, Rect},
 };
 
-use crate::fireball::CreateFireball;
+use crate::{
+    crystal::{Crystal, CrystalData},
+    fireball::CreateFireball,
+};
 
 #[hyperfold_engine::component(Singleton)]
 struct Wizard;
@@ -65,13 +68,27 @@ hyperfold_engine::components!(
 
 #[hyperfold_engine::system]
 fn track_wizard(
-    _ev: &core::Update,
+    update: &core::Update,
     camera: &mut render_system::Camera,
-    WizardData { pos, .. }: WizardData,
+    WizardData { pos: wiz_pos, .. }: WizardData,
+    CrystalData { pos: crys_pos, .. }: CrystalData,
 ) {
-    camera
-        .0
-        .set_pos(pos.0.cx(), pos.0.cy(), Align::Center, Align::Center)
+    let (wiz_pos, crys_pos) = (wiz_pos.0.center(), crys_pos.0.center());
+    let pos = match wiz_pos.dist(crys_pos) < camera.0.w.min(camera.0.h) / 2.0 {
+        true => crys_pos,
+        false => wiz_pos,
+    };
+    let cam_pos = camera.0.center();
+    let mut delta = pos - cam_pos;
+    if delta.mag() > 1.0 {
+        delta = delta * (update.0 as f32 / 500.0).min(1.0);
+    }
+    camera.0.set_pos(
+        cam_pos.x + delta.x,
+        cam_pos.y + delta.y,
+        Align::Center,
+        Align::Center,
+    )
 }
 
 #[hyperfold_engine::system]

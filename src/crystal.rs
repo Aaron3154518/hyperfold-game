@@ -16,6 +16,11 @@ use hyperfold_engine::{
     },
 };
 
+#[hyperfold_engine::component(Singleton)]
+struct Crystal;
+
+hyperfold_engine::components!(labels(Crystal), CrystalData, pos: &'a physics::Position,);
+
 #[hyperfold_engine::system(Init)]
 fn init_crystal(
     entities: &mut dyn crate::_engine::AddComponent,
@@ -75,5 +80,6 @@ fn init_crystal(
             w: 100.0,
             h: 100.0,
         }),
+        Crystal
     );
 }

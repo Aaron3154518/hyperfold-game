@@ -50,7 +50,7 @@ hyperfold_engine::game_crate!();
 // #[hyperfold_engine::system]
 // fn bar(
 //     ev: &hyperfold_engine::ecs::events::core::Update,
-//     not: hyperfold_engine::ecs::systems::Entities<NoIn>,
+//     not: hyperfold_engine::ecs::systems::Vec<NoIn>,
 //     thing: Thing,
 // ) {
 // }

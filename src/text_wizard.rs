@@ -95,32 +95,34 @@ hyperfold_engine::components!(
 fn rotate_text_wizard(
     update: &Update,
     screen: &render_system::Screen,
-    RotateTextWizard { pos, rot, .. }: RotateTextWizard,
+    entities: Vec<RotateTextWizard>,
 ) {
-    rot.theta = (rot.theta + update.0 as f32 * PI / 5000.0) % TAU;
-    let c = PointF {
-        x: screen.0.w as f32 / 2.0,
-        y: screen.0.h as f32 / 2.0,
-    };
-    pos.0.set_pos(
-        rot.r * rot.theta.cos() + c.x,
-        rot.r * rot.theta.sin() + c.y,
-        Align::Center,
-        Align::Center,
-    );
-    // let d = PointF {
-    //     x: screen.0.w as f32 / 2.0,
-    //     y: screen.0.h as f32 / 2.0,
-    // } - pos.0.center();
-    // let mag = d.mag();
-    // if mag < F32_ERR {
-    //     pd.a = PointF { x: 0.0, y: 0.0 };
-    // } else {
-    //     let v_mag = pd.v.mag();
-    //     let frac = v_mag.powf(2.0) / mag + 5.0;
-    //     pd.a = PointF {
-    //         x: d.x * frac / mag,
-    //         y: d.y * frac / mag,
-    //     }
-    // }
+    for RotateTextWizard { pos, rot, .. } in entities {
+        rot.theta = (rot.theta + update.0 as f32 * PI / 5000.0) % TAU;
+        let c = PointF {
+            x: screen.0.w as f32 / 2.0,
+            y: screen.0.h as f32 / 2.0,
+        };
+        pos.0.set_pos(
+            rot.r * rot.theta.cos() + c.x,
+            rot.r * rot.theta.sin() + c.y,
+            Align::Center,
+            Align::Center,
+        );
+        // let d = PointF {
+        //     x: screen.0.w as f32 / 2.0,
+        //     y: screen.0.h as f32 / 2.0,
+        // } - pos.0.center();
+        // let mag = d.mag();
+        // if mag < F32_ERR {
+        //     pd.a = PointF { x: 0.0, y: 0.0 };
+        // } else {
+        //     let v_mag = pd.v.mag();
+        //     let frac = v_mag.powf(2.0) / mag + 5.0;
+        //     pd.a = PointF {
+        //         x: d.x * frac / mag,
+        //         y: d.y * frac / mag,
+        //     }
+        // }
+    }
 }
