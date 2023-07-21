@@ -4,7 +4,12 @@ use hyperfold_engine::{
         events::core,
     },
     framework::{
-        event_system, physics,
+        event_system::{
+            self,
+            inputs::{self, Click},
+            Drag, DragTrigger,
+        },
+        physics,
         render_system::{
             self,
             render_data::{Animation, RenderAsset, RenderDataBuilderTrait},
@@ -53,9 +58,33 @@ fn init_wizard(
             h: 100.0,
         }),
         physics::PhysicsData::new(),
+        Drag::new(DragTrigger::DelayMs(500)),
         Timer(1000),
         Wizard
     );
+}
+
+hyperfold_engine::components!(
+    labels(Wizard),
+    WizardDragData,
+    pos: &'a mut physics::Position,
+);
+
+#[hyperfold_engine::system]
+fn drag_wizard(drag: &inputs::Drag, WizardDragData { pos, .. }: WizardDragData) {
+    pos.0.set_pos(
+        drag.mouse_x as f32,
+        drag.mouse_y as f32,
+        Align::Center,
+        Align::Center,
+    );
+}
+
+#[hyperfold_engine::system]
+fn click_wizard(m: &Click, WizardDragData { eid, .. }: WizardDragData) {
+    if m.is_me(eid) {
+        eprintln!("Clicked :#)")
+    }
 }
 
 hyperfold_engine::components!(
@@ -93,7 +122,7 @@ fn track_wizard(
 
 #[hyperfold_engine::system]
 fn move_keys(ev: &event_system::inputs::Key, WizardData { pd, .. }: WizardData) {
-    const V: f32 = 250.0;
+    const V: f32 = 150.0;
     if let Some((val, amnt)) = match ev.0.key {
         SDLK_a => Some((&mut pd.v.x, -V)),
         SDLK_d => Some((&mut pd.v.x, V)),
