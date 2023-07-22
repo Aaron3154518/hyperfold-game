@@ -7,7 +7,7 @@ use hyperfold_engine::{
         event_system::{
             self,
             inputs::{self, Click},
-            Drag, DragTrigger,
+            DragTrigger,
         },
         physics,
         render_system::{
@@ -58,7 +58,7 @@ fn init_wizard(
             h: 100.0,
         }),
         physics::PhysicsData::new(),
-        Drag::new(DragTrigger::DelayMs(500)),
+        DragTrigger::OnMove,
         Timer(1000),
         Wizard
     );
