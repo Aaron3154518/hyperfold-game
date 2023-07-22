@@ -5,9 +5,8 @@ use hyperfold_engine::{
     },
     framework::{
         event_system::{
-            self,
-            inputs::{self, Click},
-            DragTrigger,
+            components::DragTrigger,
+            events::{Click, Drag, Key},
         },
         physics,
         render_system::{
@@ -17,13 +16,10 @@ use hyperfold_engine::{
         },
     },
     sdl2::SDL_KeyCode::*,
-    utils::rect::{Align, PointF, Rect},
+    utils::rect::{Align, Rect},
 };
 
-use crate::{
-    crystal::{Crystal, CrystalData},
-    fireball::CreateFireball,
-};
+use crate::{crystal::CrystalPos, fireball::CreateFireball};
 
 #[hyperfold_engine::component(Singleton)]
 struct Wizard;
@@ -71,7 +67,7 @@ hyperfold_engine::components!(
 );
 
 #[hyperfold_engine::system]
-fn drag_wizard(drag: &inputs::Drag, WizardDragData { pos, .. }: WizardDragData) {
+fn drag_wizard(drag: &Drag, WizardDragData { pos, .. }: WizardDragData) {
     pos.0.set_pos(
         drag.mouse_x as f32,
         drag.mouse_y as f32,
@@ -100,7 +96,7 @@ fn track_wizard(
     update: &core::Update,
     camera: &mut render_system::Camera,
     WizardData { pos: wiz_pos, .. }: WizardData,
-    CrystalData { pos: crys_pos, .. }: CrystalData,
+    CrystalPos { pos: crys_pos, .. }: CrystalPos,
 ) {
     let (wiz_pos, crys_pos) = (wiz_pos.0.center(), crys_pos.0.center());
     let pos = match wiz_pos.dist(crys_pos) < camera.0.w.min(camera.0.h) / 2.0 {
@@ -121,8 +117,8 @@ fn track_wizard(
 }
 
 #[hyperfold_engine::system]
-fn move_keys(ev: &event_system::inputs::Key, WizardData { pd, .. }: WizardData) {
-    const V: f32 = 150.0;
+fn move_keys(ev: &Key, WizardData { pd, .. }: WizardData) {
+    const V: f32 = 250.0;
     if let Some((val, amnt)) = match ev.0.key {
         SDLK_a => Some((&mut pd.v.x, -V)),
         SDLK_d => Some((&mut pd.v.x, V)),
@@ -143,7 +139,6 @@ fn move_keys(ev: &event_system::inputs::Key, WizardData { pd, .. }: WizardData) 
 fn update(
     ev: &core::Update,
     events: &mut dyn crate::_engine::AddEvent,
-    screen: &render_system::Screen,
     WizardData { timer, pos, .. }: WizardData,
 ) {
     timer.0 -= ev.0 as i32;
@@ -151,10 +146,6 @@ fn update(
         timer.0 += 1000;
         events.new_event(CreateFireball {
             pos: pos.0.center(),
-            target: PointF {
-                x: screen.0.w as f32 / 2.0,
-                y: screen.0.h as f32 / 2.0,
-            },
         });
     }
 }

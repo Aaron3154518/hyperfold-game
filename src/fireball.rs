@@ -10,13 +10,14 @@ use hyperfold_engine::{
     utils::rect::{PointF, Rect},
 };
 
+use crate::crystal::{CrystalData, CrystalPos};
+
 #[hyperfold_engine::component]
 struct Fireball;
 
 #[hyperfold_engine::event]
 struct CreateFireball {
     pub pos: PointF,
-    pub target: PointF,
 }
 
 #[hyperfold_engine::system]
@@ -27,12 +28,6 @@ pub fn new_fireball(
     am: &mut AssetManager,
 ) {
     let e = Entity::new();
-    let (mut dx, mut dy) = (data.target.x - data.pos.x, data.target.y - data.pos.y);
-    let mag = (dx * dx + dy * dy).sqrt();
-    if mag > 0.0 {
-        dx *= 150.0 / mag;
-        dy *= 150.0 / mag;
-    }
     hyperfold_engine::add_components!(
         entities,
         e,
@@ -49,7 +44,7 @@ pub fn new_fireball(
             h: 50.0,
         }),
         physics::PhysicsData {
-            v: PointF { x: dx, y: dy },
+            v: PointF::new(),
             a: PointF::new(),
             boundary: None
         },
@@ -57,7 +52,12 @@ pub fn new_fireball(
     );
 }
 
-hyperfold_engine::components!(labels(Fireball), UpdateFireball, pos: &'a physics::Position,);
+hyperfold_engine::components!(
+    labels(Fireball),
+    UpdateFireball,
+    pos: &'a physics::Position,
+    pd: &'a mut physics::PhysicsData
+);
 
 #[hyperfold_engine::system]
 fn update_fireball(
@@ -65,10 +65,19 @@ fn update_fireball(
     camera: &render_system::Camera,
     trash: &mut EntityTrash,
     fballs: Vec<UpdateFireball>,
+    crystal: CrystalPos,
+    CrystalData { data, .. }: CrystalData,
 ) {
-    for UpdateFireball { eid, pos } in fballs {
-        if !pos.0.intersects(&camera.0) {
-            trash.0.push(*eid)
+    for UpdateFireball { eid, pos, pd } in fballs {
+        let target = crystal.pos.0.center();
+        let (mut dx, mut dy) = (target.x - pos.0.cx(), target.y - pos.0.cy());
+        let mag = (dx * dx + dy * dy).sqrt();
+        if mag <= 1.0 {
+            trash.0.push(*eid);
+            data.magic += 1;
+        } else {
+            pd.v.x = dx * 150.0 / mag;
+            pd.v.y = dy * 150.0 / mag;
         }
     }
 }
