@@ -19,13 +19,17 @@ use hyperfold_engine::{
     utils::rect::{Align, Rect},
 };
 
-use crate::{crystal::CrystalPos, fireball::CreateFireball};
+use crate::{
+    crystal::{crystal_radius, CrystalPos},
+    fireball::CreateFireball,
+    utils::{
+        elevations::Elevations,
+        timer::{Timer, TimerTrait},
+    },
+};
 
 #[hyperfold_engine::component(Singleton)]
 struct Wizard;
-
-#[hyperfold_engine::component]
-struct Timer(i32);
 
 #[hyperfold_engine::system(Init)]
 fn init_wizard(
@@ -42,7 +46,8 @@ fn init_wizard(
     hyperfold_engine::add_components!(
         entities,
         e,
-        render_system::Elevation(2),
+        Wizard,
+        render_system::Elevation(Elevations::Wizards as u8),
         rc,
         anim,
         physics::Position(Rect {
@@ -53,19 +58,15 @@ fn init_wizard(
         }),
         physics::PhysicsData::new(),
         DragTrigger::OnMove,
-        Timer(1000),
-        Wizard
+        Timer::new(1000),
     );
 }
 
-hyperfold_engine::components!(
-    labels(Wizard),
-    WizardDragData,
-    pos: &'a mut physics::Position,
-);
+hyperfold_engine::components!(labels(Wizard), WizardPos, pos: &'a physics::Position,);
+hyperfold_engine::components!(labels(Wizard), WizardPosMut, pos: &'a mut physics::Position,);
 
 #[hyperfold_engine::system]
-fn drag_wizard(drag: &Drag, WizardDragData { pos, .. }: WizardDragData) {
+fn drag_wizard(drag: &Drag, WizardPosMut { pos, .. }: WizardPosMut) {
     pos.0.set_pos(
         drag.mouse_x as f32,
         drag.mouse_y as f32,
@@ -75,29 +76,21 @@ fn drag_wizard(drag: &Drag, WizardDragData { pos, .. }: WizardDragData) {
 }
 
 #[hyperfold_engine::system]
-fn click_wizard(m: &Click, WizardDragData { eid, .. }: WizardDragData) {
+fn click_wizard(m: &Click, WizardPos { eid, .. }: WizardPos) {
     if m.is_me(eid) {
         eprintln!("Clicked :#)")
     }
 }
 
-hyperfold_engine::components!(
-    labels(Wizard),
-    WizardData,
-    pos: &'a physics::Position,
-    pd: &'a mut physics::PhysicsData,
-    timer: &'a mut Timer,
-);
-
 #[hyperfold_engine::system]
 fn track_wizard(
     update: &core::Update,
     camera: &mut render_system::Camera,
-    WizardData { pos: wiz_pos, .. }: WizardData,
+    WizardPos { pos: wiz_pos, .. }: WizardPos,
     CrystalPos { pos: crys_pos, .. }: CrystalPos,
 ) {
     let (wiz_pos, crys_pos) = (wiz_pos.0.center(), crys_pos.0.center());
-    let pos = match wiz_pos.dist(crys_pos) < camera.0.w.min(camera.0.h) / 2.0 {
+    let pos = match wiz_pos.dist(crys_pos) < crystal_radius(camera) {
         true => crys_pos,
         false => wiz_pos,
     };
@@ -113,6 +106,14 @@ fn track_wizard(
         Align::Center,
     )
 }
+
+hyperfold_engine::components!(
+    labels(Wizard),
+    WizardData,
+    pos: &'a physics::Position,
+    pd: &'a mut physics::PhysicsData,
+    timer: &'a mut Timer,
+);
 
 #[hyperfold_engine::system]
 fn move_keys(ev: &Key, WizardData { pd, .. }: WizardData) {
@@ -135,13 +136,11 @@ fn move_keys(ev: &Key, WizardData { pd, .. }: WizardData) {
 
 #[hyperfold_engine::system]
 fn update(
-    ev: &core::Update,
+    dt: &core::Update,
     events: &mut dyn crate::_engine::AddEvent,
     WizardData { timer, pos, .. }: WizardData,
 ) {
-    timer.0 -= ev.0 as i32;
-    while timer.0 <= 0 {
-        timer.0 += 1000;
+    for _ in 0..timer.add_time(dt.0) {
         events.new_event(CreateFireball {
             pos: pos.0.center(),
         });

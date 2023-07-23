@@ -23,6 +23,8 @@ use hyperfold_engine::{
     },
 };
 
+use crate::utils::elevations::Elevations;
+
 #[hyperfold_engine::component]
 struct Rotation {
     r: f32,
@@ -91,7 +93,7 @@ fn init_text_wizard(
     hyperfold_engine::add_components!(
         entities,
         e,
-        render_system::Elevation(2),
+        render_system::Elevation(Elevations::Wizards as u8),
         RenderComponent::new(
             RenderText::new(FontData {
                 w: Some(100),

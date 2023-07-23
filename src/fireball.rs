@@ -10,7 +10,10 @@ use hyperfold_engine::{
     utils::rect::{PointF, Rect},
 };
 
-use crate::crystal::{CrystalData, CrystalPos};
+use crate::{
+    crystal::{CrystalData, CrystalPos},
+    utils::elevations::Elevations,
+};
 
 #[hyperfold_engine::component]
 struct Fireball;
@@ -31,7 +34,8 @@ pub fn new_fireball(
     hyperfold_engine::add_components!(
         entities,
         e,
-        render_system::Elevation(0),
+        Fireball,
+        render_system::Elevation(Elevations::Projectiles as u8),
         render_system::RenderComponent::new(RenderAsset::from_file(
             "res/projectiles/fireball.png".to_string(),
             r,
@@ -48,7 +52,6 @@ pub fn new_fireball(
             a: PointF::new(),
             boundary: None
         },
-        Fireball
     );
 }
 
@@ -71,7 +74,7 @@ fn update_fireball(
         let target = crystal.pos.0.center();
         let (dx, dy) = (target.x - pos.0.cx(), target.y - pos.0.cy());
         let mag = (dx * dx + dy * dy).sqrt();
-        if mag <= 1.0 {
+        if mag <= 5.0 {
             trash.0.push(*eid);
             data.magic += 100;
         } else {

@@ -2,8 +2,10 @@
 #![feature(drain_filter)]
 
 mod crystal;
+mod enemies;
 mod fireball;
 mod text_wizard;
+mod utils;
 mod wizard;
 
 hyperfold_engine::game_crate!();

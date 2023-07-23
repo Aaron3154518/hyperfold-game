@@ -116,6 +116,8 @@ name = "hyperfold-game"
 version = "0.1.0"
 dependencies = [
  "hyperfold_engine",
+ "itertools",
+ "rand",
 ]
 
 [[package]]

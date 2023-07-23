@@ -12,7 +12,7 @@ use hyperfold_engine::{
             render_data::{Fit, RenderAsset, RenderDataBuilderTrait, RenderTexture},
             render_text::{RenderText, TextImage},
             shapes::{Circle, ShapeTrait},
-            Asset, AssetManager, RenderComponent, Renderer, Texture,
+            Asset, AssetManager, Camera, RenderComponent, Renderer, Texture,
         },
     },
     utils::{
@@ -21,6 +21,12 @@ use hyperfold_engine::{
         util::AsType,
     },
 };
+
+use crate::utils::elevations::Elevations;
+
+pub fn crystal_radius(camera: &Camera) -> f32 {
+    camera.0.w.min(camera.0.h) / 2.0
+}
 
 // Crystal components
 #[hyperfold_engine::component(Singleton)]
@@ -59,6 +65,7 @@ fn init_crystal(
     r: &Renderer,
     am: &mut AssetManager,
     screen: &render_system::Screen,
+    camera: &Camera,
 ) {
     // Crystal
     let cx = screen.0.w as f32 / 2.0;
@@ -70,7 +77,8 @@ fn init_crystal(
     hyperfold_engine::add_components!(
         entities,
         e,
-        render_system::Elevation(1),
+        Crystal,
+        render_system::Elevation(Elevations::Crystal as u8),
         RenderComponent::new(RenderAsset::new(
             Asset::File("res/wizards/crystal.png".to_string()),
             r,
@@ -78,7 +86,6 @@ fn init_crystal(
         )),
         physics::Position(rect),
         CrystalNumbers::new(),
-        Crystal
     );
 
     // Magic text
@@ -101,7 +108,7 @@ fn init_crystal(
     hyperfold_engine::add_components!(
         entities,
         e,
-        render_system::Elevation(1),
+        render_system::Elevation(Elevations::Crystal as u8),
         RenderComponent::new(
             RenderText::new(FontData {
                 w: None,
@@ -124,17 +131,18 @@ fn init_crystal(
     );
 
     // Boundary circle
-    let w = screen.0.w.min(screen.0.h);
-    let tex = Texture::new(r, w, w, TRANSPARENT);
+    let rad = crystal_radius(camera);
+    let diam = rad + rad;
+    let tex = Texture::new(r, diam as u32, diam as u32, TRANSPARENT);
     tex.draw(
         r,
         &mut Circle::new()
             .set_color(RED)
             .set_center(Point {
-                x: w as i32 / 2,
-                y: w as i32 / 2,
+                x: rad as i32,
+                y: rad as i32,
             })
-            .border(w / 2, -3, false)
+            .border(rad as u32, -3, false)
             .dashed(20),
     );
 
@@ -142,11 +150,11 @@ fn init_crystal(
     hyperfold_engine::add_components!(
         entities,
         e,
-        render_system::Elevation(0),
+        render_system::Elevation(Elevations::Background as u8),
         RenderComponent::new(RenderTexture::new(Some(tex))),
         physics::Position(
             rect.clone()
-                .with_dim(w as f32, w as f32, Align::Center, Align::Center)
+                .with_dim(diam, diam, Align::Center, Align::Center)
         )
     );
 }
