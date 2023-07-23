@@ -11,13 +11,12 @@ use hyperfold_engine::{
             font::{FontData, TIMES},
             render_data::{Fit, RenderAsset, RenderDataBuilderTrait, RenderTexture},
             render_text::{RenderText, TextImage},
-            renderer::W,
-            shapes::{Circle, Rectangle, ShapeTrait},
-            AssetManager, RenderComponent, Renderer, Texture,
+            shapes::{Circle, ShapeTrait},
+            Asset, AssetManager, RenderComponent, Renderer, Texture,
         },
     },
     utils::{
-        colors::{BLUE, GREEN, MAGENTA, RED, TRANSPARENT, WHITE},
+        colors::{RED, TRANSPARENT, WHITE},
         rect::{Align, Point, Rect},
         util::AsType,
     },
@@ -62,46 +61,6 @@ fn init_crystal(
     screen: &render_system::Screen,
 ) {
     // Crystal
-    let tex = Texture::new(r, 100, 100, MAGENTA);
-    tex.draw(
-        r,
-        &mut Rectangle::new()
-            .set_color(BLUE)
-            .set_boundary(Rect {
-                x: 5.0,
-                y: 5.0,
-                w: 95.0,
-                h: 95.0,
-            })
-            .fill(Rect {
-                x: 0.0,
-                y: 0.0,
-                w: 50.0,
-                h: 50.0,
-            })
-            .except(Rect {
-                x: 40.0,
-                y: 40.0,
-                w: 40.0,
-                h: 40.0,
-            }),
-    );
-    tex.draw(
-        r,
-        &mut Circle::new()
-            .set_color(GREEN)
-            .set_boundary(Rect {
-                x: 0.0,
-                y: 5.0,
-                w: 95.0,
-                h: 95.0,
-            })
-            .set_center(Point { x: 85, y: 15 })
-            .border(13, 3, true)
-            .dashed(20)
-            .set_angle_deg(180.0, 45.0),
-    );
-
     let cx = screen.0.w as f32 / 2.0;
     let cy = screen.0.h as f32 / 2.0;
 
@@ -112,7 +71,11 @@ fn init_crystal(
         entities,
         e,
         render_system::Elevation(1),
-        RenderComponent::new(RenderTexture::new(Some(tex))),
+        RenderComponent::new(RenderAsset::new(
+            Asset::File("res/wizards/crystal.png".to_string()),
+            r,
+            am
+        )),
         physics::Position(rect),
         CrystalNumbers::new(),
         Crystal
@@ -129,7 +92,7 @@ fn init_crystal(
         rect.cx(),
         rect.y,
         rect.w,
-        50.0,
+        30.0,
         Align::Center,
         Align::BotRight,
     );

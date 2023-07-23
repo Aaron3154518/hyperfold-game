@@ -9,15 +9,17 @@ use hyperfold_engine::{
         physics::Position,
         render_system::{
             self,
+            drawable::Canvas,
             font::{FontData, TIMES},
-            render_data::{Animation, Fit, RenderAsset, RenderDataBuilderTrait},
+            render_data::{Animation, Fit, RenderAsset, RenderDataBuilderTrait, RenderTexture},
             render_text::{RenderText, TextImage},
-            AssetManager, RenderComponent, Renderer,
+            shapes::{Circle, Rectangle, ShapeTrait},
+            AssetManager, RenderComponent, Renderer, Texture,
         },
     },
     utils::{
-        colors::{TRANSPARENT, WHITE},
-        rect::{Align, PointF, Rect},
+        colors::{BLUE, GREEN, MAGENTA, TRANSPARENT, WHITE},
+        rect::{Align, Point, PointF, Rect},
     },
 };
 
@@ -44,6 +46,47 @@ fn init_text_wizard(
     );
     hyperfold_engine::add_components!(entities, anim_e, anim, rc);
 
+    // Draw shapes
+    let tex = Texture::new(r, 100, 100, MAGENTA);
+    tex.draw(
+        r,
+        &mut Rectangle::new()
+            .set_color(BLUE)
+            .set_boundary(Rect {
+                x: 5.0,
+                y: 5.0,
+                w: 95.0,
+                h: 95.0,
+            })
+            .fill(Rect {
+                x: 0.0,
+                y: 0.0,
+                w: 50.0,
+                h: 50.0,
+            })
+            .except(Rect {
+                x: 40.0,
+                y: 40.0,
+                w: 40.0,
+                h: 40.0,
+            }),
+    );
+    tex.draw(
+        r,
+        &mut Circle::new()
+            .set_color(GREEN)
+            .set_boundary(Rect {
+                x: 0.0,
+                y: 5.0,
+                w: 95.0,
+                h: 95.0,
+            })
+            .set_center(Point { x: 85, y: 15 })
+            .border(13, 3, true)
+            .dashed(20)
+            .set_angle_deg(180.0, 45.0),
+    );
+
     let e = Entity::new();
     hyperfold_engine::add_components!(
         entities,
@@ -52,20 +95,21 @@ fn init_text_wizard(
         RenderComponent::new(
             RenderText::new(FontData {
                 w: Some(100),
-                h: Some(50),
+                h: Some(30),
                 sample: "World".to_string(),
                 file: TIMES.to_string(),
             })
-            .with_text("Hello[i][i]World")
+            .with_text("Hello[b][i][i][b]World\n[i]")
             .with_text_align(Align::Center, Align::Center)
-            .with_dest_fit(Fit::fit_dest())
+            .with_dest_fit(Fit::fit_width())
             .with_images(vec![
                 TextImage::Render(RenderComponent::new(RenderAsset::from_file(
                     "res/projectiles/fireball2.png".to_string(),
                     r,
                     am
                 ))),
-                TextImage::Reference(anim_e)
+                TextImage::Reference(anim_e),
+                TextImage::Render(RenderComponent::new(RenderTexture::new(Some(tex))))
             ])
             .with_text_color(WHITE)
             .with_background_color(TRANSPARENT)
