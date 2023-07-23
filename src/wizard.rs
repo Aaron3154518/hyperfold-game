@@ -35,18 +35,16 @@ fn init_wizard(
     camera: &render_system::Camera,
 ) {
     let e = Entity::new();
+    let anim = Animation::new(5, 150);
     let rc = render_system::RenderComponent::new(
-        RenderAsset::from_file("res/wizards/wizard_ss.png".to_string(), r, am).with_animation(
-            entities,
-            e,
-            Animation::new(5, 150),
-        ),
+        RenderAsset::from_file("res/wizards/wizard_ss.png".to_string(), r, am).with_animation(anim),
     );
     hyperfold_engine::add_components!(
         entities,
         e,
         render_system::Elevation(2),
         rc,
+        anim,
         physics::Position(Rect {
             x: camera.0.cx() - 50.0,
             y: camera.0.cy() - 150.0,

@@ -62,7 +62,6 @@ hyperfold_engine::components!(
 #[hyperfold_engine::system]
 fn update_fireball(
     _e: &events::core::Update,
-    camera: &render_system::Camera,
     trash: &mut EntityTrash,
     fballs: Vec<UpdateFireball>,
     crystal: CrystalPos,
@@ -70,11 +69,11 @@ fn update_fireball(
 ) {
     for UpdateFireball { eid, pos, pd } in fballs {
         let target = crystal.pos.0.center();
-        let (mut dx, mut dy) = (target.x - pos.0.cx(), target.y - pos.0.cy());
+        let (dx, dy) = (target.x - pos.0.cx(), target.y - pos.0.cy());
         let mag = (dx * dx + dy * dy).sqrt();
         if mag <= 1.0 {
             trash.0.push(*eid);
-            data.magic += 1;
+            data.magic += 100;
         } else {
             pd.v.x = dx * 150.0 / mag;
             pd.v.y = dy * 150.0 / mag;

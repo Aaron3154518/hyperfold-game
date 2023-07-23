@@ -10,7 +10,7 @@ use hyperfold_engine::{
         render_system::{
             self,
             font::{FontData, TIMES},
-            render_data::{Animation, FitMode, RenderAsset, RenderDataBuilderTrait},
+            render_data::{Animation, Fit, RenderAsset, RenderDataBuilderTrait},
             render_text::{RenderText, TextImage},
             AssetManager, RenderComponent, Renderer,
         },
@@ -37,12 +37,12 @@ fn init_text_wizard(
     am: &mut AssetManager,
 ) {
     let anim_e = Entity::new();
-
-    let anim = RenderComponent::new(
+    let anim = Animation::new(8, 100);
+    let rc = RenderComponent::new(
         RenderAsset::from_file("res/wizards/power_wizard_ss.png".to_string(), r, am)
-            .with_animation(entities, anim_e, Animation::new(8, 100)),
+            .with_animation(anim),
     );
-    hyperfold_engine::add_components!(entities, anim_e, anim, Position(Rect::new()));
+    hyperfold_engine::add_components!(entities, anim_e, anim, rc);
 
     let e = Entity::new();
     hyperfold_engine::add_components!(
@@ -56,9 +56,9 @@ fn init_text_wizard(
                 sample: "World".to_string(),
                 file: TIMES.to_string(),
             })
-            .with_text("Hello{i}{i}World".to_string())
+            .with_text("Hello[i][i]World")
             .with_text_align(Align::Center, Align::Center)
-            .with_dest_fit(FitMode::FitWithin(Align::Center, Align::Center))
+            .with_dest_fit(Fit::fit_dest())
             .with_images(vec![
                 TextImage::Render(RenderComponent::new(RenderAsset::from_file(
                     "res/projectiles/fireball2.png".to_string(),

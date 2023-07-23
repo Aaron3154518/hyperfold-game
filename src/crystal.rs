@@ -9,11 +9,11 @@ use hyperfold_engine::{
             self,
             drawable::Canvas,
             font::{FontData, TIMES},
-            render_data::{FitMode, RenderDataBuilderTrait, RenderTexture},
-            render_text::RenderText,
+            render_data::{Fit, RenderAsset, RenderDataBuilderTrait, RenderTexture},
+            render_text::{RenderText, TextImage},
             renderer::W,
             shapes::{Circle, Rectangle, ShapeTrait},
-            RenderComponent, Renderer, Texture,
+            AssetManager, RenderComponent, Renderer, Texture,
         },
     },
     utils::{
@@ -58,6 +58,7 @@ hyperfold_engine::components!(
 fn init_crystal(
     entities: &mut dyn crate::_engine::AddComponent,
     r: &Renderer,
+    am: &mut AssetManager,
     screen: &render_system::Screen,
 ) {
     // Crystal
@@ -140,15 +141,20 @@ fn init_crystal(
         render_system::Elevation(1),
         RenderComponent::new(
             RenderText::new(FontData {
-                w: Some(text_rect.w as u32),
+                w: None,
                 h: Some(text_rect.h as u32),
                 sample: "9.99e999".to_string(),
                 file: TIMES.to_string()
             })
             .with_text_align(Align::Center, Align::BotRight)
             .with_text_color(WHITE)
+            .with_text("[i]")
+            .with_images(vec![TextImage::Render(RenderComponent::new(
+                RenderAsset::from_file("res/wizards/catalyst.png".to_string(), r, am)
+            ))])
             .with_background_color(TRANSPARENT)
-            .with_dest_fit(FitMode::FitWithin(Align::Center, Align::BotRight))
+            .with_dest_fit(Fit::fit_height())
+            .with_dest_align(Align::Center, Align::BotRight)
         ),
         physics::Position(text_rect),
         CrystalText
@@ -190,7 +196,7 @@ fn update_crystal_text(
         data,
         ..
     }: CrystalData,
-    CrystalTextData { pos, text, .. }: CrystalTextData,
+    CrystalTextData { text, .. }: CrystalTextData,
 ) {
     // pos.0.set_pos(
     //     crys_pos.0.cx(),
@@ -199,5 +205,5 @@ fn update_crystal_text(
     //     Align::BotRight,
     // );
 
-    text.try_mut(|text: &mut RenderText| text.set_text(format!("{}", data.magic)));
+    text.try_mut(|text: &mut RenderText| text.set_text(&format!("{}[i]", data.magic)));
 }
