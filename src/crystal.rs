@@ -120,7 +120,7 @@ fn init_crystal(
             .with_text_color(WHITE)
             .with_text("[i]")
             .with_images(vec![TextImage::Render(RenderComponent::new(
-                RenderAsset::from_file("res/wizards/catalyst.png".to_string(), r, am)
+                RenderAsset::from_file("res/wizards/catalyst.png", r, am)
             ))])
             .with_background_color(TRANSPARENT)
             .with_dest_fit(Fit::fit_height())

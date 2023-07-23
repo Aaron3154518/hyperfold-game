@@ -43,8 +43,7 @@ fn init_text_wizard(
     let anim_e = Entity::new();
     let anim = Animation::new(8, 100);
     let rc = RenderComponent::new(
-        RenderAsset::from_file("res/wizards/power_wizard_ss.png".to_string(), r, am)
-            .with_animation(anim),
+        RenderAsset::from_file("res/wizards/power_wizard_ss.png", r, am).with_animation(anim),
     );
     hyperfold_engine::add_components!(entities, anim_e, anim, rc);
 
@@ -106,7 +105,7 @@ fn init_text_wizard(
             .with_dest_fit(Fit::fit_width())
             .with_images(vec![
                 TextImage::Render(RenderComponent::new(RenderAsset::from_file(
-                    "res/projectiles/fireball2.png".to_string(),
+                    "res/projectiles/fireball2.png",
                     r,
                     am
                 ))),

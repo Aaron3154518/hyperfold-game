@@ -37,7 +37,7 @@ pub fn new_fireball(
         Fireball,
         render_system::Elevation(Elevations::Projectiles as u8),
         render_system::RenderComponent::new(RenderAsset::from_file(
-            "res/projectiles/fireball.png".to_string(),
+            "res/projectiles/fireball.png",
             r,
             am
         )),

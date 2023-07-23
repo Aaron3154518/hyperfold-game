@@ -8,17 +8,17 @@ use hyperfold_engine::{
     },
     framework::render_system::{AssetManager, Camera, Renderer},
     sdl2::SDL_FPoint,
-    utils::rect::PointF,
+    utils::{
+        rect::PointF,
+        timer::{Timer, TimerTrait},
+    },
 };
 use rand::Rng;
 
 use crate::{
     _engine::AddComponent,
     crystal::{crystal_radius, CrystalPos},
-    utils::{
-        rand_sign::RandSign,
-        timer::{Timer, TimerTrait},
-    },
+    utils::rand_sign::RandSign,
     wizard::WizardPos,
 };
 

@@ -16,16 +16,16 @@ use hyperfold_engine::{
         },
     },
     sdl2::SDL_KeyCode::*,
-    utils::rect::{Align, Rect},
+    utils::{
+        rect::{Align, Rect},
+        timer::{Timer, TimerTrait},
+    },
 };
 
 use crate::{
     crystal::{crystal_radius, CrystalPos},
     fireball::CreateFireball,
-    utils::{
-        elevations::Elevations,
-        timer::{Timer, TimerTrait},
-    },
+    utils::elevations::Elevations,
 };
 
 #[hyperfold_engine::component(Singleton)]
@@ -41,7 +41,7 @@ fn init_wizard(
     let e = Entity::new();
     let anim = Animation::new(5, 150);
     let rc = render_system::RenderComponent::new(
-        RenderAsset::from_file("res/wizards/wizard_ss.png".to_string(), r, am).with_animation(anim),
+        RenderAsset::from_file("res/wizards/wizard_ss.png", r, am).with_animation(anim),
     );
     hyperfold_engine::add_components!(
         entities,
