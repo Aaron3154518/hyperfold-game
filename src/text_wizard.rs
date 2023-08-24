@@ -36,7 +36,7 @@ struct TextWizard;
 
 #[hyperfold_engine::system(Init)]
 fn init_text_wizard(
-    entities: &mut dyn crate::_engine::AddComponent,
+    entities: &mut dyn crate::_engine::Components,
     r: &Renderer,
     am: &mut AssetManager,
 ) {

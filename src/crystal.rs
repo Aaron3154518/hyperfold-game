@@ -61,7 +61,7 @@ hyperfold_engine::components!(
 // Crystal systems
 #[hyperfold_engine::system(Init)]
 fn init_crystal(
-    entities: &mut dyn crate::_engine::AddComponent,
+    entities: &mut dyn crate::_engine::Components,
     r: &Renderer,
     am: &mut AssetManager,
     screen: &render_system::Screen,
@@ -89,12 +89,6 @@ fn init_crystal(
     );
 
     // Magic text
-    // let text_rect = Rect {
-    //     x: 0.0,
-    //     y: 0.0,
-    //     w: rect.w,
-    //     h: 50.0,
-    // };
     let text_rect = Rect::from(
         rect.cx(),
         rect.y,
@@ -176,5 +170,5 @@ fn update_crystal_text(
     //     Align::BotRight,
     // );
 
-    text.try_mut(|text: &mut RenderText| text.set_text(&format!("{}[i]", data.magic)));
+    text.try_as_mut(|text: &mut RenderText| text.set_text(&format!("{}[i]", data.magic)));
 }

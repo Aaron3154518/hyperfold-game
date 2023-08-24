@@ -16,7 +16,7 @@ use hyperfold_engine::{
 use rand::Rng;
 
 use crate::{
-    _engine::AddComponent,
+    _engine::Components,
     crystal::{crystal_radius, CrystalPos},
     utils::rand_sign::RandSign,
     wizard::WizardPos,
@@ -28,7 +28,7 @@ use super::enemy::spawn_enemy;
 struct EnemySpawner;
 
 #[hyperfold_engine::system(Init)]
-fn init_enemy_spawner(entities: &mut dyn AddComponent) {
+fn init_enemy_spawner(entities: &mut dyn Components) {
     let e = Entity::new();
     add_components!(entities, e, EnemySpawner, Timer::new(1000));
 }
@@ -45,7 +45,7 @@ fn enemy_spawner_timer(
     EnemySpawnerTimer { timer, .. }: EnemySpawnerTimer,
     wizard: WizardPos,
     crystal: CrystalPos,
-    entities: &mut dyn AddComponent,
+    entities: &mut dyn Components,
     r: &Renderer,
     am: &mut AssetManager,
     camera: &Camera,

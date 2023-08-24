@@ -17,7 +17,7 @@ use hyperfold_engine::{
 use itertools::Itertools;
 
 use crate::{
-    _engine::AddComponent,
+    _engine::Components,
     crystal::{crystal_radius, CrystalPos},
     utils::elevations::Elevations,
     wizard::WizardPos,
@@ -28,7 +28,7 @@ struct Enemy;
 
 pub fn spawn_enemy(
     pos: PointF,
-    entities: &mut dyn AddComponent,
+    entities: &mut dyn Components,
     r: &Renderer,
     am: &mut AssetManager,
 ) {

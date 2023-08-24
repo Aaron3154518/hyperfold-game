@@ -26,7 +26,7 @@ struct CreateFireball {
 #[hyperfold_engine::system]
 pub fn new_fireball(
     data: &CreateFireball,
-    entities: &mut dyn crate::_engine::AddComponent,
+    entities: &mut dyn crate::_engine::Components,
     r: &Renderer,
     am: &mut AssetManager,
 ) {

@@ -33,7 +33,7 @@ struct Wizard;
 
 #[hyperfold_engine::system(Init)]
 fn init_wizard(
-    entities: &mut dyn crate::_engine::AddComponent,
+    entities: &mut dyn crate::_engine::Components,
     r: &Renderer,
     am: &mut AssetManager,
     camera: &render_system::Camera,
@@ -137,7 +137,7 @@ fn move_keys(ev: &Key, WizardData { pd, .. }: WizardData) {
 #[hyperfold_engine::system]
 fn update(
     dt: &core::Update,
-    events: &mut dyn crate::_engine::AddEvent,
+    events: &mut dyn crate::_engine::Events,
     WizardData { timer, pos, .. }: WizardData,
 ) {
     for _ in 0..timer.add_time(dt.0) {
