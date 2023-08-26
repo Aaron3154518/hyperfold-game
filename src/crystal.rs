@@ -22,7 +22,11 @@ use hyperfold_engine::{
     },
 };
 
-use crate::utils::elevations::Elevations;
+use crate::{
+    param_dag::{Dag, NodeTrait, Root},
+    roots,
+    utils::elevations::Elevations,
+};
 
 pub fn crystal_radius(camera: &Camera) -> f32 {
     camera.0.w.min(camera.0.h) / 2.0
@@ -32,20 +36,9 @@ pub fn crystal_radius(camera: &Camera) -> f32 {
 #[hyperfold_engine::component(Singleton)]
 struct Crystal;
 
-#[hyperfold_engine::component(Singleton)]
-struct CrystalNumbers {
-    pub magic: u32,
-}
-
-impl CrystalNumbers {
-    pub fn new() -> Self {
-        Self { magic: 0 }
-    }
-}
+roots!(CrystalNumbers(Magic = 0));
 
 hyperfold_engine::components!(labels(Crystal), CrystalPos, pos: &'a physics::Position);
-
-hyperfold_engine::components!(labels(Crystal), CrystalData, data: &'a mut CrystalNumbers);
 
 // Crystal text components
 #[hyperfold_engine::component(Singleton)]
@@ -85,7 +78,6 @@ fn init_crystal(
             am
         )),
         physics::Position(rect),
-        CrystalNumbers::new(),
     );
 
     // Magic text
@@ -154,15 +146,7 @@ fn init_crystal(
 }
 
 #[hyperfold_engine::system]
-fn update_crystal_text(
-    _: &Update,
-    CrystalData {
-        // pos: crys_pos,
-        data,
-        ..
-    }: CrystalData,
-    CrystalTextData { text, .. }: CrystalTextData,
-) {
+fn update_crystal_text(_: &Update, CrystalTextData { text, .. }: CrystalTextData, dag: &mut Dag) {
     // pos.0.set_pos(
     //     crys_pos.0.cx(),
     //     crys_pos.0.y,
@@ -170,5 +154,7 @@ fn update_crystal_text(
     //     Align::BotRight,
     // );
 
-    text.try_as_mut(|text: &mut RenderText| text.set_text(&format!("{}[i]", data.magic)));
+    text.try_as_mut(|text: &mut RenderText| {
+        text.set_text(&format!("{}[i]", dag.get_root(CrystalNumbers::Magic)))
+    });
 }

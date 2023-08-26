@@ -11,7 +11,8 @@ use hyperfold_engine::{
 };
 
 use crate::{
-    crystal::{CrystalData, CrystalPos},
+    crystal::{CrystalNumbers, CrystalPos},
+    param_dag::Dag,
     utils::elevations::Elevations,
 };
 
@@ -68,7 +69,7 @@ fn update_fireball(
     trash: &mut EntityTrash,
     fballs: Vec<UpdateFireball>,
     crystal: CrystalPos,
-    CrystalData { data, .. }: CrystalData,
+    dag: &mut Dag,
 ) {
     for UpdateFireball { eid, pos, pd } in fballs {
         let target = crystal.pos.0.center();
@@ -76,7 +77,7 @@ fn update_fireball(
         let mag = (dx * dx + dy * dy).sqrt();
         if mag <= 5.0 {
             trash.0.push(*eid);
-            data.magic += 100;
+            dag.update_root(CrystalNumbers::Magic, |m| m + 100);
         } else {
             pd.v.x = dx * 150.0 / mag;
             pd.v.y = dy * 150.0 / mag;

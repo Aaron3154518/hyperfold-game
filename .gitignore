@@ -4,5 +4,5 @@ sdl
 .vscode
 out*.txt
 test.*
-test/
+testing/
 out2.rs

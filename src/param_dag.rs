@@ -1,138 +1,301 @@
-use std::{any::TypeId, collections::HashMap};
+use std::{
+    any::TypeId,
+    collections::{hash_map::DefaultHasher, VecDeque},
+    hash::{Hash, Hasher},
+    iter::{once, Rev},
+    slice::Iter,
+    vec::IntoIter,
+};
 
 use hyperfold_engine::utils::util::get_time;
+use itertools::Itertools;
+
+type NodeId = u64;
 
 struct RootValue<T> {
+    id: NodeId,
     value: T,
     updated: u32,
+}
+
+impl<T: 'static> RootValue<T> {
+    pub fn default(r: &dyn Root<T>) -> Self {
+        Self {
+            id: r.id(),
+            value: r.default(),
+            updated: get_time(),
+        }
+    }
 }
 
 pub trait UpdateFunc<const A: usize, const B: usize> = Fn([u32; A], [u32; B]) -> u32;
 
 struct UpdateData<const A: usize, const B: usize, F: UpdateFunc<A, B>> {
-    roots: [(DagIdx, u32); A],
-    nodes: [DagIdx; B],
+    roots: [usize; A],
+    nodes: [usize; B],
     func: F,
 }
 
 pub trait Update {
-    fn get(&self, dag: &mut Dag) -> u32;
+    fn update(&self, dag: &Dag, updated: u32) -> Option<u32>;
+
+    fn get_roots(&self) -> Iter<usize>;
+
+    fn get_nodes(&self) -> Iter<usize>;
+
+    fn get_nodes_desc(&self) -> Rev<IntoIter<usize>> {
+        self.get_nodes().copied().sorted().rev()
+    }
+
+    fn update_nodes(&mut self, idxs: &Vec<usize>);
 }
 
 impl<const A: usize, const B: usize, F: UpdateFunc<A, B>> Update for UpdateData<A, B, F> {
-    fn get(&self, dag: &mut Dag) -> u32 {
-        (self.func)(
-            self.roots
-                .each_ref()
-                .map(|(idx, def)| dag.get_root_impl(*idx, *def)),
-            self.nodes.each_ref().map(|idx| dag.get_node_impl(*idx)),
-        )
+    fn update(&self, dag: &Dag, updated: u32) -> Option<u32> {
+        let mut update = false;
+        let roots = self.roots.clone().map(|i| {
+            let r = &dag.roots[i];
+            update = update || r.updated > updated;
+            r.value
+        });
+        let nodes = self.nodes.clone().map(|i| {
+            let n = &dag.nodes[i];
+            update = update || n.updated > updated;
+            n.value
+        });
+        update.then(|| (self.func)(roots, nodes))
+    }
+
+    fn get_roots(&self) -> Iter<usize> {
+        self.roots.iter()
+    }
+
+    fn get_nodes(&self) -> Iter<usize> {
+        self.nodes.iter()
+    }
+
+    fn update_nodes(&mut self, idxs: &Vec<usize>) {
+        for i in &mut self.nodes {
+            *i = idxs[*i];
+        }
     }
 }
 
 struct NodeValue<T> {
+    id: NodeId,
+    depth: usize,
     value: T,
     update: Box<dyn Update>,
     updated: u32,
 }
 
+impl<T> NodeValue<T> {
+    pub fn default(n: &dyn Node, value: T) -> Self {
+        Self {
+            id: n.id(),
+            depth: 0,
+            value,
+            update: Box::new(UpdateData {
+                roots: [],
+                nodes: [],
+                func: |[], []| unimplemented!(),
+            }),
+            updated: 0,
+        }
+    }
+}
+
 pub trait NodeTrait: 'static {
+    fn idx(&self) -> u8;
+
     fn type_id(&self) -> TypeId {
         TypeId::of::<Self>()
     }
 
-    fn idx(&self) -> u32;
+    fn id(&self) -> NodeId {
+        let mut hasher = DefaultHasher::new();
+        self.type_id().hash(&mut hasher);
+        self.idx().hash(&mut hasher);
+        hasher.finish()
+    }
 }
 
-pub trait Root: NodeTrait {
-    fn default(&self) -> u32;
+pub trait Root<T>: NodeTrait {
+    fn default(&self) -> T;
 }
 
 pub trait Node: NodeTrait {}
 
-pub type DagIdx = (TypeId, u32);
-
 #[hyperfold_engine::global]
 struct Dag {
-    roots: Vec<(DagIdx, RootValue<u32>)>,
-    nodes: HashMap<DagIdx, NodeValue<u32>>,
+    roots: Vec<RootValue<u32>>,
+    nodes: Vec<NodeValue<u32>>,
 }
 
 impl Dag {
     pub fn new() -> Self {
         Self {
             roots: Vec::new(),
-            nodes: HashMap::new(),
+            nodes: Vec::new(),
         }
     }
 
-    // fn get_time() -> u64 {
-    //     SystemTime::now()
-    //         .duration_since(UNIX_EPOCH)
-    //         .map(|d| d.as_secs() * 1000 + d.subsec_nanos() as u64 / 1_000_000)
-    //         .expect("Failed to get time")
-    // }
+    fn find_node(&self, id: NodeId) -> Option<(usize, &NodeValue<u32>)> {
+        self.nodes.iter().enumerate().find(|(_, n)| n.id == id)
+    }
 
-    pub fn get_node_impl(&mut self, idx: DagIdx) -> u32 {
-        0
+    fn find_root(&self, id: NodeId) -> Option<(usize, &RootValue<u32>)> {
+        self.roots.iter().enumerate().find(|(_, r)| r.id == id)
+    }
+
+    fn get_node_impl(&mut self, id: NodeId) -> u32 {
+        // Collect all indices in descending order
+        let (idx, _) = self.find_node(id).expect("Node does not exist");
+        let mut idxs: VecDeque<_> = once(idx).collect();
+        let mut i = 0;
+        while i < idxs.len() {
+            let n_i = idxs[i];
+            let mut j = 0;
+            // Add this node's dependencies
+            for n2_i in self.nodes[n_i].update.get_nodes_desc() {
+                while j < idxs.len() && idxs[j] > n2_i {
+                    j += 1;
+                }
+                if j >= idxs.len() || idxs[j] != n2_i {
+                    idxs.push_back(n2_i);
+                }
+            }
+            i += 1;
+        }
+
+        // Iterate over dependencies and update if necessary
+        let t = get_time();
+        for i in idxs.iter().rev() {
+            let node = &self.nodes[*i];
+            if let Some(val) = node.update.update(self, node.updated) {
+                self.nodes[*i].value = val;
+            }
+            self.nodes[*i].updated = t;
+        }
+
+        self.nodes[idx].value
     }
 
     pub fn get_node<N: Node>(&mut self, n: N) -> u32 {
-        self.get_node_impl((n.type_id(), n.idx()))
+        self.get_node_impl(n.id())
     }
 
     pub fn add_node<N: Node, const A: usize, const B: usize>(
         &mut self,
         n: N,
-        roots: [&dyn Root; A],
+        roots: [&dyn Root<u32>; A],
         nodes: [&dyn Node; B],
         func: impl UpdateFunc<A, B> + 'static,
     ) {
-        let roots = roots.map(|r| ((r.type_id(), r.idx()), r.default()));
-        let nodes = nodes.map(|n| (n.type_id(), n.idx()));
+        let roots = roots.map(|r| match self.find_root(r.id()) {
+            Some((i, _)) => i,
+            None => {
+                self.roots.push(RootValue::default(r));
+                self.roots.len() - 1
+            }
+        });
+        let nodes = nodes.map(|n| match self.find_node(n.id()) {
+            Some((i, _)) => i,
+            None => {
+                self.nodes.push(NodeValue::default(n, 0));
+                self.nodes.len() - 1
+            }
+        });
 
-        let idx = (n.type_id(), n.idx());
-        let node = NodeValue {
-            value: 0,
-            update: Box::new(UpdateData { roots, nodes, func }),
-            updated: 0,
+        // Insert/update the node
+        let id = n.id();
+        let depth = nodes.iter().fold(0, |m, idx| m.max(self.nodes[*idx].depth));
+        let update = Box::new(UpdateData { roots, nodes, func });
+        let prev_depth = match self.nodes.iter_mut().find(|n| n.id == id) {
+            Some(n) => {
+                n.update = update;
+                n.updated = 0;
+                std::mem::replace(&mut n.depth, depth)
+            }
+            None => {
+                self.nodes.push(NodeValue {
+                    id,
+                    depth,
+                    value: 0,
+                    update,
+                    updated: 0,
+                });
+                0
+            }
         };
-        self.nodes.insert(idx, node);
+
+        // Update node depth and re-sort by depth
+        let mut depths: Vec<_> = self.nodes.iter().map(|n| n.depth).collect();
+        for (i, n) in self
+            .nodes
+            .iter_mut()
+            .enumerate()
+            .filter(|(_, n)| n.depth > prev_depth)
+        {
+            let nodes = n.update.get_nodes();
+            let depth = nodes.fold(0, |m, idx| m.max(depths[*idx]));
+            if depth != n.depth {
+                n.depth = depth;
+                depths[i] = depth;
+            }
+        }
+        // Get new indices for each node
+        let idxs: Vec<_> = (self.nodes.iter().enumerate())
+            .map(|(i, n)| (i, (n.depth, n.id)))
+            .sorted_by_key(|(_, key)| *key)
+            .map(|(i, _)| i)
+            .collect();
+        // Update stored node indices
+        self.nodes.sort_by_key(|n| (n.depth, n.id));
+        for n in &mut self.nodes {
+            n.update.update_nodes(&idxs);
+        }
     }
 
-    fn get_root_impl(&mut self, idx: DagIdx, default: u32) -> u32 {
-        match self.roots.iter().find(|r| r.0 == idx) {
-            Some(r) => r.1.value,
+    fn get_root_impl(&mut self, id: NodeId, default: u32) -> u32 {
+        match self.roots.iter().find(|r| r.id == id) {
+            Some(r) => r.value,
             None => {
-                self.roots.push((
-                    idx,
-                    RootValue {
-                        value: default,
-                        updated: get_time(),
-                    },
-                ));
+                self.roots.push(RootValue {
+                    id,
+                    value: default,
+                    updated: get_time(),
+                });
                 default
             }
         }
     }
 
-    pub fn get_root<R: Root>(&mut self, r: R) -> u32 {
-        self.get_root_impl((r.type_id(), r.idx()), r.default())
+    pub fn get_root<R: Root<u32>>(&mut self, r: R) -> u32 {
+        self.get_root_impl(r.id(), r.default())
     }
 
-    pub fn set_root<R: Root>(&mut self, r: R, value: u32) {
-        let idx = (r.type_id(), r.idx());
-        let value = RootValue {
-            value,
-            updated: get_time(),
-        };
-        match self.roots.iter_mut().find(|r| r.0 == idx) {
-            Some(r) => r.1 = value,
-            None => self.roots.push((idx, value)),
+    pub fn set_root<R: Root<u32>>(&mut self, r: R, value: u32) {
+        let id = r.id();
+        match self.roots.iter_mut().find(|r| r.id == id) {
+            Some(r) => {
+                r.value = value;
+                r.updated = get_time();
+            }
+            None => self.roots.push(RootValue {
+                id,
+                value,
+                updated: get_time(),
+            }),
         }
     }
 
-    pub fn add_root<R: Root>(&mut self, r: R) {
+    pub fn update_root<R: Root<u32>>(&mut self, r: R, f: impl FnOnce(u32) -> u32) {
+        let val = f(self.get_root_impl(r.id(), r.default()));
+        self.set_root(r, val)
+    }
+
+    pub fn add_root<R: Root<u32>>(&mut self, r: R) {
         let value = r.default();
         self.set_root(r, value)
     }
@@ -164,12 +327,12 @@ macro_rules! roots {
         }
 
         impl NodeTrait for $name {
-            fn idx(&self) -> u32 {
-                *self as u32
+            fn idx(&self) -> u8 {
+                *self as u8
             }
         }
 
-        impl Root for $name {
+        impl Root<u32> for $name {
             fn default(&self) -> u32 {
                 match self {
                     $($name::$v => $n),*
