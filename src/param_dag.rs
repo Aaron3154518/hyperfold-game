@@ -10,6 +10,7 @@ use std::{
 use hyperfold_engine::utils::util::get_time;
 use itertools::Itertools;
 
+// Node Structs
 type NodeId = u64;
 
 struct RootValue<T> {
@@ -105,6 +106,7 @@ impl<T> NodeValue<T> {
     }
 }
 
+// Node Traits
 pub trait NodeTrait: 'static {
     fn idx(&self) -> u8;
 
@@ -126,6 +128,7 @@ pub trait Root<T>: NodeTrait {
 
 pub trait Node: NodeTrait {}
 
+// Dag
 #[hyperfold_engine::global]
 struct Dag {
     roots: Vec<RootValue<u32>>,
@@ -148,7 +151,7 @@ impl Dag {
         self.roots.iter().enumerate().find(|(_, r)| r.id == id)
     }
 
-    fn get_node_impl(&mut self, id: NodeId) -> u32 {
+    fn get_node_impl(&mut self, id: NodeId) -> &NodeValue<u32> {
         // Collect all indices in descending order
         let (idx, _) = self.find_node(id).expect("Node does not exist");
         let mut idxs: VecDeque<_> = once(idx).collect();
@@ -178,11 +181,11 @@ impl Dag {
             self.nodes[*i].updated = t;
         }
 
-        self.nodes[idx].value
+        &self.nodes[idx]
     }
 
     pub fn get_node<N: Node>(&mut self, n: N) -> u32 {
-        self.get_node_impl(n.id())
+        self.get_node_impl(n.id()).value
     }
 
     pub fn add_node<N: Node, const A: usize, const B: usize>(
@@ -257,25 +260,26 @@ impl Dag {
         }
     }
 
-    fn get_root_impl(&mut self, id: NodeId, default: u32) -> u32 {
-        match self.roots.iter().find(|r| r.id == id) {
-            Some(r) => r.value,
+    fn get_root_impl(&mut self, id: NodeId, default: u32) -> &RootValue<u32> {
+        let idx = match self.roots.iter().position(|r| r.id == id) {
+            Some(i) => i,
             None => {
                 self.roots.push(RootValue {
                     id,
                     value: default,
                     updated: get_time(),
                 });
-                default
+                self.roots.len() - 1
             }
-        }
+        };
+        &self.roots[idx]
     }
 
     pub fn get_root<R: Root<u32>>(&mut self, r: R) -> u32 {
-        self.get_root_impl(r.id(), r.default())
+        self.get_root_impl(r.id(), r.default()).value
     }
 
-    pub fn set_root<R: Root<u32>>(&mut self, r: R, value: u32) {
+    pub fn set<R: Root<u32>>(&mut self, r: R, value: u32) {
         let id = r.id();
         match self.roots.iter_mut().find(|r| r.id == id) {
             Some(r) => {
@@ -290,14 +294,14 @@ impl Dag {
         }
     }
 
-    pub fn update_root<R: Root<u32>>(&mut self, r: R, f: impl FnOnce(u32) -> u32) {
-        let val = f(self.get_root_impl(r.id(), r.default()));
-        self.set_root(r, val)
+    pub fn update<R: Root<u32>>(&mut self, r: R, f: impl FnOnce(u32) -> u32) {
+        let val = f(self.get_root_impl(r.id(), r.default()).value);
+        self.set(r, val)
     }
 
     pub fn add_root<R: Root<u32>>(&mut self, r: R) {
         let value = r.default();
-        self.set_root(r, value)
+        self.set(r, value)
     }
 }
 
@@ -342,9 +346,53 @@ macro_rules! roots {
     };
 }
 
-roots!(DagVals(A = 1, B = 2, C = 3));
+// Observers
+pub struct RootObserver<T> {
+    checked: u32,
+    id: NodeId,
+    default: T,
+}
 
-#[hyperfold_engine::system(Init)]
-fn init_dag(dag: &mut Dag) {
-    dag.add_root(DagVals::A);
+impl RootObserver<u32> {
+    pub fn check(&mut self, dag: &mut Dag, f: impl FnOnce(u32)) {
+        let r = dag.get_root_impl(self.id, self.default);
+        if self.checked < r.updated {
+            f(r.value);
+            self.checked = get_time();
+        }
+    }
+}
+
+impl<R: Root<u32>> From<R> for RootObserver<u32> {
+    fn from(root: R) -> Self {
+        Self {
+            checked: 0,
+            id: root.id(),
+            default: root.default(),
+        }
+    }
+}
+
+pub struct NodeObserver {
+    checked: u32,
+    id: NodeId,
+}
+
+impl NodeObserver {
+    pub fn check(&mut self, dag: &mut Dag, f: impl FnOnce(u32)) {
+        let n = dag.get_node_impl(self.id);
+        if self.checked < n.updated {
+            f(n.value);
+            self.checked = get_time();
+        }
+    }
+}
+
+impl<N: Node> From<N> for NodeObserver {
+    fn from(node: N) -> Self {
+        Self {
+            checked: 0,
+            id: node.id(),
+        }
+    }
 }

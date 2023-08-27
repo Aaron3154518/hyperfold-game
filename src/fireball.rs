@@ -77,7 +77,7 @@ fn update_fireball(
         let mag = (dx * dx + dy * dy).sqrt();
         if mag <= 5.0 {
             trash.0.push(*eid);
-            dag.update_root(CrystalNumbers::Magic, |m| m + 100);
+            dag.update(CrystalNumbers::Magic, |m| m + 100);
         } else {
             pd.v.x = dx * 150.0 / mag;
             pd.v.y = dy * 150.0 / mag;

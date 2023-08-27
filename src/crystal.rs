@@ -23,7 +23,7 @@ use hyperfold_engine::{
 };
 
 use crate::{
-    param_dag::{Dag, NodeTrait, Root},
+    param_dag::{Dag, NodeTrait, Root, RootObserver},
     roots,
     utils::elevations::Elevations,
 };
@@ -38,6 +38,19 @@ struct Crystal;
 
 roots!(CrystalNumbers(Magic = 0));
 
+#[hyperfold_engine::component]
+struct CrystalTextObservers {
+    pub magic: RootObserver<u32>,
+}
+
+impl CrystalTextObservers {
+    pub fn new() -> Self {
+        Self {
+            magic: CrystalNumbers::Magic.into(),
+        }
+    }
+}
+
 hyperfold_engine::components!(labels(Crystal), CrystalPos, pos: &'a physics::Position);
 
 // Crystal text components
@@ -48,7 +61,8 @@ hyperfold_engine::components!(
     labels(CrystalText),
     CrystalTextData,
     pos: &'a mut physics::Position,
-    text: &'a mut RenderComponent
+    text: &'a mut RenderComponent,
+    observers: &'a mut CrystalTextObservers
 );
 
 // Crystal systems
@@ -113,7 +127,8 @@ fn init_crystal(
             .with_dest_align(Align::Center, Align::BotRight)
         ),
         physics::Position(text_rect),
-        CrystalText
+        CrystalText,
+        CrystalTextObservers::new(),
     );
 
     // Boundary circle
@@ -146,7 +161,13 @@ fn init_crystal(
 }
 
 #[hyperfold_engine::system]
-fn update_crystal_text(_: &Update, CrystalTextData { text, .. }: CrystalTextData, dag: &mut Dag) {
+fn update_crystal_text(
+    _: &Update,
+    CrystalTextData {
+        text, observers, ..
+    }: CrystalTextData,
+    dag: &mut Dag,
+) {
     // pos.0.set_pos(
     //     crys_pos.0.cx(),
     //     crys_pos.0.y,
@@ -154,7 +175,7 @@ fn update_crystal_text(_: &Update, CrystalTextData { text, .. }: CrystalTextData
     //     Align::BotRight,
     // );
 
-    text.try_as_mut(|text: &mut RenderText| {
-        text.set_text(&format!("{}[i]", dag.get_root(CrystalNumbers::Magic)))
+    observers.magic.check(dag, |m| {
+        text.try_as_mut(|text: &mut RenderText| text.set_text(&format!("{m}[i]")));
     });
 }
