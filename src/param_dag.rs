@@ -306,8 +306,8 @@ impl Dag {
 }
 
 #[macro_export]
-macro_rules! roots {
-    ($name: ident = $v: literal) => {
+macro_rules! parameters {
+    (@def $name: ident) => {
         #[derive(Copy, Clone)]
         pub struct $name;
 
@@ -316,15 +316,9 @@ macro_rules! roots {
                 0
             }
         }
-
-        impl Root for $name {
-            fn default(&self) -> u32 {
-                $v
-            }
-        }
     };
 
-    ($name: ident ($($v: ident = $n: literal),+)) => {
+    (@def $name: ident ($($v: ident),+)) => {
         #[derive(Copy, Clone)]
         pub enum $name {
             $($v),*
@@ -335,7 +329,29 @@ macro_rules! roots {
                 *self as u8
             }
         }
+    };
 
+    ($name: ident) => {
+        $crate::parameters!(@def $name);
+        impl Node for $name {}
+    };
+
+    ($name: ident ($($v: ident),+)) => {
+        $crate::parameters!(@def $name ($($v),*));
+        impl Node for $name {}
+    };
+
+    ($name: ident = $v: literal) => {
+        $crate::parameters!(@def $name);
+        impl Root for $name {
+            fn default(&self) -> u32 {
+                $v
+            }
+        }
+    };
+
+    ($name: ident ($($v: ident = $n: literal),+)) => {
+        $crate::parameters!(@def $name ($($v),*));
         impl Root<u32> for $name {
             fn default(&self) -> u32 {
                 match self {

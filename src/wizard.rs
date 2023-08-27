@@ -23,10 +23,24 @@ use hyperfold_engine::{
 };
 
 use crate::{
-    crystal::{crystal_radius, CrystalPos},
+    crystal::{crystal_radius, CrystalNumbers, CrystalPos},
     fireball::CreateFireball,
+    param_dag::{Dag, Node, NodeTrait},
+    parameters,
     utils::elevations::Elevations,
 };
+
+parameters!(WizardNumbers(Power));
+
+#[hyperfold_engine::system(Init)]
+fn init_wizard_numbers(dag: &mut Dag) {
+    dag.add_node(
+        WizardNumbers::Power,
+        [&CrystalNumbers::Magic],
+        [],
+        |[m], []| (m + 1).ilog10() + 1,
+    );
+}
 
 #[hyperfold_engine::component(Singleton)]
 struct Wizard;
@@ -139,10 +153,12 @@ fn update(
     dt: &core::Update,
     events: &mut dyn crate::_engine::Events,
     WizardData { timer, pos, .. }: WizardData,
+    dag: &mut Dag,
 ) {
     for _ in 0..timer.add_time(dt.0) {
         events.new_event(CreateFireball {
             pos: pos.0.center(),
+            value: dag.get_node(WizardNumbers::Power),
         });
     }
 }

@@ -17,11 +17,14 @@ use crate::{
 };
 
 #[hyperfold_engine::component]
-struct Fireball;
+struct Fireball {
+    pub value: u32,
+}
 
 #[hyperfold_engine::event]
 struct CreateFireball {
     pub pos: PointF,
+    pub value: u32,
 }
 
 #[hyperfold_engine::system]
@@ -35,7 +38,7 @@ pub fn new_fireball(
     hyperfold_engine::add_components!(
         entities,
         e,
-        Fireball,
+        Fireball { value: data.value },
         render_system::Elevation(Elevations::Projectiles as u8),
         render_system::RenderComponent::new(RenderAsset::from_file(
             "res/projectiles/fireball.png",
@@ -57,10 +60,10 @@ pub fn new_fireball(
 }
 
 hyperfold_engine::components!(
-    labels(Fireball),
     UpdateFireball,
     pos: &'a physics::Position,
-    pd: &'a mut physics::PhysicsData
+    pd: &'a mut physics::PhysicsData,
+    fb: &'a Fireball
 );
 
 #[hyperfold_engine::system]
@@ -71,13 +74,13 @@ fn update_fireball(
     crystal: CrystalPos,
     dag: &mut Dag,
 ) {
-    for UpdateFireball { eid, pos, pd } in fballs {
+    for UpdateFireball { eid, pos, pd, fb } in fballs {
         let target = crystal.pos.0.center();
         let (dx, dy) = (target.x - pos.0.cx(), target.y - pos.0.cy());
         let mag = (dx * dx + dy * dy).sqrt();
         if mag <= 5.0 {
             trash.0.push(*eid);
-            dag.update(CrystalNumbers::Magic, |m| m + 100);
+            dag.update(CrystalNumbers::Magic, |m| m + fb.value);
         } else {
             pd.v.x = dx * 150.0 / mag;
             pd.v.y = dy * 150.0 / mag;

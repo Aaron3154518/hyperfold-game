@@ -24,7 +24,7 @@ use hyperfold_engine::{
 
 use crate::{
     param_dag::{Dag, NodeTrait, Root, RootObserver},
-    roots,
+    parameters,
     utils::elevations::Elevations,
 };
 
@@ -36,7 +36,7 @@ pub fn crystal_radius(camera: &Camera) -> f32 {
 #[hyperfold_engine::component(Singleton)]
 struct Crystal;
 
-roots!(CrystalNumbers(Magic = 0));
+parameters!(CrystalNumbers(Magic = 0));
 
 #[hyperfold_engine::component]
 struct CrystalTextObservers {
