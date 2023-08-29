@@ -7,24 +7,27 @@ use hyperfold_engine::{
         physics,
         render_system::{self, render_data::RenderAsset, AssetManager, Renderer},
     },
-    utils::rect::{PointF, Rect},
+    utils::{
+        number::Number,
+        rect::{PointF, Rect},
+    },
 };
 
 use crate::{
     crystal::{CrystalNumbers, CrystalPos},
-    param_dag::Dag,
+    param_dag::NumDag,
     utils::elevations::Elevations,
 };
 
 #[hyperfold_engine::component]
 struct Fireball {
-    pub value: u32,
+    pub value: Number,
 }
 
 #[hyperfold_engine::event]
 struct CreateFireball {
     pub pos: PointF,
-    pub value: u32,
+    pub value: Number,
 }
 
 #[hyperfold_engine::system]
@@ -72,7 +75,7 @@ fn update_fireball(
     trash: &mut EntityTrash,
     fballs: Vec<UpdateFireball>,
     crystal: CrystalPos,
-    dag: &mut Dag,
+    dag: &mut NumDag,
 ) {
     for UpdateFireball { eid, pos, pd, fb } in fballs {
         let target = crystal.pos.0.center();
@@ -80,7 +83,7 @@ fn update_fireball(
         let mag = (dx * dx + dy * dy).sqrt();
         if mag <= 5.0 {
             trash.0.push(*eid);
-            dag.update(CrystalNumbers::Magic, |m| m + fb.value);
+            dag.0.update(CrystalNumbers::Magic, |m| *m + fb.value);
         } else {
             pd.v.x = dx * 150.0 / mag;
             pd.v.y = dy * 150.0 / mag;

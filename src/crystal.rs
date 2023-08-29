@@ -17,13 +17,15 @@ use hyperfold_engine::{
     },
     utils::{
         colors::{RED, TRANSPARENT, WHITE},
+        number::Number,
         rect::{Align, Point, Rect},
         util::AsType,
     },
 };
 
 use crate::{
-    param_dag::{Dag, NodeTrait, Root, RootObserver},
+    observers,
+    param_dag::{NodeTrait, NumDag, Observe, Observer, Root},
     parameters,
     utils::elevations::Elevations,
 };
@@ -38,18 +40,14 @@ struct Crystal;
 
 parameters!(CrystalNumbers(Magic = 0));
 
-#[hyperfold_engine::component]
-struct CrystalTextObservers {
-    pub magic: RootObserver<u32>,
-}
+#[hyperfold_engine::component(Dummy)]
+struct CrystalTextObservers;
 
-impl CrystalTextObservers {
-    pub fn new() -> Self {
-        Self {
-            magic: CrystalNumbers::Magic.into(),
-        }
+observers!(
+    CrystalTextObservers<Number> {
+        magic = CrystalNumbers::Magic
     }
-}
+);
 
 hyperfold_engine::components!(labels(Crystal), CrystalPos, pos: &'a physics::Position);
 
@@ -166,7 +164,7 @@ fn update_crystal_text(
     CrystalTextData {
         text, observers, ..
     }: CrystalTextData,
-    dag: &mut Dag,
+    dag: &mut NumDag,
 ) {
     // pos.0.set_pos(
     //     crys_pos.0.cx(),
@@ -175,7 +173,7 @@ fn update_crystal_text(
     //     Align::BotRight,
     // );
 
-    observers.magic.check(dag, |m| {
+    observers.magic.check(&mut dag.0, |m| {
         text.try_as_mut(|text: &mut RenderText| text.set_text(&format!("{m}[i]")));
     });
 }

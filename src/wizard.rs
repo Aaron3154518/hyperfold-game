@@ -17,6 +17,7 @@ use hyperfold_engine::{
     },
     sdl2::SDL_KeyCode::*,
     utils::{
+        number::Number,
         rect::{Align, Rect},
         timer::{Timer, TimerTrait},
     },
@@ -25,7 +26,7 @@ use hyperfold_engine::{
 use crate::{
     crystal::{crystal_radius, CrystalNumbers, CrystalPos},
     fireball::CreateFireball,
-    param_dag::{Dag, Node, NodeTrait},
+    param_dag::{Node, NodeTrait, NumDag},
     parameters,
     utils::elevations::Elevations,
 };
@@ -33,12 +34,12 @@ use crate::{
 parameters!(WizardNumbers(Power));
 
 #[hyperfold_engine::system(Init)]
-fn init_wizard_numbers(dag: &mut Dag) {
-    dag.add_node(
+fn init_wizard_numbers(dag: &mut NumDag) {
+    dag.0.add_node(
         WizardNumbers::Power,
         [&CrystalNumbers::Magic],
         [],
-        |[m], []| (m + 1).ilog10() + 1,
+        |[m], []| (*m + 1.into()).log10() + 1.into(),
     );
 }
 
@@ -153,12 +154,12 @@ fn update(
     dt: &core::Update,
     events: &mut dyn crate::_engine::Events,
     WizardData { timer, pos, .. }: WizardData,
-    dag: &mut Dag,
+    dag: &mut NumDag,
 ) {
     for _ in 0..timer.add_time(dt.0) {
         events.new_event(CreateFireball {
             pos: pos.0.center(),
-            value: dag.get_node(WizardNumbers::Power),
+            value: *dag.0.get(WizardNumbers::Power),
         });
     }
 }
