@@ -38,6 +38,7 @@ pub fn crystal_radius(camera: &Camera) -> f32 {
 #[hyperfold_engine::component(Singleton)]
 struct Crystal;
 
+// Parameters
 parameters!(CrystalNumbers(Magic = 0));
 
 #[hyperfold_engine::component(Dummy)]

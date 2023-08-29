@@ -120,6 +120,7 @@ fn id(type_id: TypeId, idx: u8) -> NodeId {
     hasher.finish()
 }
 
+// NodeTrait + Node or Root are the only traits that need to be implemented
 pub trait NodeTrait: 'static {
     fn idx(&self) -> u8;
 
@@ -134,14 +135,15 @@ pub trait NodeTrait: 'static {
 
 pub trait Node<T>: NodeTrait {}
 
-pub struct NodeMarker;
-
 pub trait Root<T>: NodeTrait {
     fn default(&self) -> T;
 }
 
+// Used to distinctify NodeDefault and Observe traits
+pub struct NodeMarker;
 pub struct RootMarker;
 
+// Used to convert the Node/Root into an Optional default
 pub trait NodeDefault<T, U>: NodeTrait {
     fn default(&self) -> Option<T> {
         None
