@@ -1,5 +1,6 @@
 use std::{
     any::TypeId,
+    cmp::Ordering,
     collections::{hash_map::DefaultHasher, VecDeque},
     hash::{Hash, Hasher},
     iter::{once, Rev},
@@ -13,6 +14,29 @@ use itertools::Itertools;
 
 // Node Structs
 type NodeId = u64;
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub enum ValueType {
+    Root(usize),
+    Node(usize),
+}
+
+impl PartialOrd for ValueType {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for ValueType {
+    // Root < Node
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            (Self::Root(v1), Self::Root(v2)) | (Self::Node(v1), Self::Node(v2)) => v1.cmp(v2),
+            (Self::Root(_), Self::Node(_)) => Ordering::Less,
+            (Self::Node(_), Self::Root(_)) => Ordering::Greater,
+        }
+    }
+}
 
 struct RootValue<T> {
     id: NodeId,
@@ -30,58 +54,56 @@ impl<T: 'static> RootValue<T> {
     }
 }
 
-pub trait UpdateFunc<T, const A: usize, const B: usize> = Fn([&T; A], [&T; B]) -> T;
+pub trait UpdateFunc<T, const N: usize> = Fn([&T; N]) -> T;
 
-struct UpdateData<T, const A: usize, const B: usize, F: UpdateFunc<T, A, B>> {
-    roots: [usize; A],
-    nodes: [usize; B],
+struct UpdateData<T, const N: usize, F: UpdateFunc<T, N>> {
+    values: [ValueType; N],
     func: F,
     pd: PhantomData<T>,
 }
 
-pub trait Update<T> {
+trait Update<T> {
     fn update(&self, dag: &Dag<T>, updated: u32) -> Option<T>;
 
-    fn get_roots(&self) -> Iter<usize>;
+    fn get_values(&self) -> Iter<ValueType>;
 
-    fn get_nodes(&self) -> Iter<usize>;
-
-    fn get_nodes_desc(&self) -> Rev<IntoIter<usize>> {
-        self.get_nodes().copied().sorted().rev()
+    fn get_values_desc(&self) -> Rev<IntoIter<ValueType>> {
+        self.get_values().copied().sorted().rev()
     }
 
     fn update_nodes(&mut self, idxs: &Vec<usize>);
 }
 
-impl<T, const A: usize, const B: usize, F: UpdateFunc<T, A, B>> Update<T>
-    for UpdateData<T, A, B, F>
-{
+impl<T, const N: usize, F: UpdateFunc<T, N>> Update<T> for UpdateData<T, N, F> {
     fn update(&self, dag: &Dag<T>, updated: u32) -> Option<T> {
         let mut update = false;
-        let roots = self.roots.clone().map(|i| {
-            let r = &dag.roots[i];
-            update = update || r.updated > updated;
-            &r.value
+        let args = self.values.clone().map(|i| {
+            let (v_updated, value) = match i {
+                ValueType::Root(i) => {
+                    let r = &dag.roots[i];
+                    (r.updated, &r.value)
+                }
+                ValueType::Node(i) => {
+                    let n = &dag.nodes[i];
+                    (n.updated, &n.value)
+                }
+            };
+            update = update || v_updated > updated;
+            value
         });
-        let nodes = self.nodes.clone().map(|i| {
-            let n = &dag.nodes[i];
-            update = update || n.updated > updated;
-            &n.value
-        });
-        update.then(|| (self.func)(roots, nodes))
+        update.then(|| (self.func)(args))
     }
 
-    fn get_roots(&self) -> Iter<usize> {
-        self.roots.iter()
-    }
-
-    fn get_nodes(&self) -> Iter<usize> {
-        self.nodes.iter()
+    fn get_values(&self) -> Iter<ValueType> {
+        self.values.iter()
     }
 
     fn update_nodes(&mut self, idxs: &Vec<usize>) {
-        for i in &mut self.nodes {
-            *i = idxs[*i];
+        for i in &mut self.values {
+            match i {
+                ValueType::Root(_) => (),
+                ValueType::Node(i) => *i = idxs[*i],
+            }
         }
     }
 }
@@ -102,9 +124,8 @@ impl<T: Default + 'static> NodeValue<T> {
             depth: 0,
             value: Default::default(),
             update: Box::new(UpdateData {
-                roots: [],
-                nodes: [],
-                func: |[], []| unimplemented!(),
+                values: [],
+                func: |_| unimplemented!(),
                 pd: PhantomData,
             }),
             updated: 0,
@@ -187,14 +208,16 @@ impl<T: 'static> Dag<T> {
         let mut i = 0;
         while i < idxs.len() {
             let n_i = idxs[i];
-            let mut j = 0;
-            // Add this node's dependencies
-            for n2_i in self.nodes[n_i].update.get_nodes_desc() {
-                while j < idxs.len() && idxs[j] > n2_i {
-                    j += 1;
-                }
-                if j >= idxs.len() || idxs[j] != n2_i {
-                    idxs.push_back(n2_i);
+            let mut j = i + 1;
+            // Add the node's dependencies
+            for n2_i in self.nodes[n_i].update.get_values_desc() {
+                if let ValueType::Node(n2_i) = n2_i {
+                    while j < idxs.len() && idxs[j] > n2_i {
+                        j += 1;
+                    }
+                    if j >= idxs.len() || idxs[j] != n2_i {
+                        idxs.push_back(n2_i);
+                    }
                 }
             }
             i += 1;
@@ -262,34 +285,36 @@ impl<T: 'static> Dag<T> {
 }
 
 impl<T: Default + 'static> Dag<T> {
-    pub fn add_node<const A: usize, const B: usize>(
+    pub fn add_node<const N: usize>(
         &mut self,
         n: impl Node<T>,
-        roots: [&dyn Root<T>; A],
-        nodes: [&dyn Node<T>; B],
-        func: impl UpdateFunc<T, A, B> + 'static,
+        (values, func): ([(NodeId, Option<T>); N], impl UpdateFunc<T, N> + 'static),
     ) {
-        let roots = roots.map(|r| match self.find_root(r.id()) {
-            Some((i, _)) => i,
-            None => {
-                self.roots.push(RootValue::new(r.id(), r.default()));
-                self.roots.len() - 1
-            }
-        });
-        let nodes = nodes.map(|n| match self.find_node(n.id()) {
-            Some((i, _)) => i,
-            None => {
-                self.nodes.push(NodeValue::default(n.id()));
-                self.nodes.len() - 1
-            }
+        let values = values.map(|(id, def)| match def {
+            Some(t) => ValueType::Root(match self.find_root(id) {
+                Some((i, _)) => i,
+                None => {
+                    self.roots.push(RootValue::new(id, t));
+                    self.roots.len() - 1
+                }
+            }),
+            None => ValueType::Node(match self.find_node(id) {
+                Some((i, _)) => i,
+                None => {
+                    self.nodes.push(NodeValue::default(id));
+                    self.nodes.len() - 1
+                }
+            }),
         });
 
         // Insert/update the node
         let id = n.id();
-        let depth = nodes.iter().fold(0, |m, idx| m.max(self.nodes[*idx].depth));
+        let depth = values.iter().fold(0, |m, idx| match idx {
+            ValueType::Root(_) => m,
+            ValueType::Node(i) => m.max(self.nodes[*i].depth),
+        });
         let update = Box::new(UpdateData {
-            roots,
-            nodes,
+            values,
             func,
             pd: PhantomData,
         });
@@ -319,8 +344,11 @@ impl<T: Default + 'static> Dag<T> {
             .enumerate()
             .filter(|(_, n)| n.depth > prev_depth)
         {
-            let nodes = n.update.get_nodes();
-            let depth = nodes.fold(0, |m, idx| m.max(depths[*idx]));
+            let nodes = n.update.get_values();
+            let depth = nodes.fold(0, |m, idx| match idx {
+                ValueType::Root(_) => m,
+                ValueType::Node(i) => m.max(depths[*i]),
+            });
             if depth != n.depth {
                 n.depth = depth;
                 depths[i] = depth;
@@ -338,6 +366,13 @@ impl<T: Default + 'static> Dag<T> {
             n.update.update_nodes(&idxs);
         }
     }
+}
+
+#[macro_export]
+macro_rules! equation {
+    (|($($var: ident: $ty: expr,)*)| $body: expr) => {
+        ([$(($ty.id(), $ty.default())),*], |[$($var),*]| $body)
+    };
 }
 
 #[hyperfold_engine::global]

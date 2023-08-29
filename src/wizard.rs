@@ -25,8 +25,9 @@ use hyperfold_engine::{
 
 use crate::{
     crystal::{crystal_radius, CrystalNumbers, CrystalPos},
+    equation,
     fireball::CreateFireball,
-    param_dag::{Node, NodeTrait, NumDag},
+    param_dag::{Node, NodeDefault, NodeTrait, NumDag},
     parameters,
     utils::elevations::Elevations,
 };
@@ -37,9 +38,7 @@ parameters!(WizardNumbers(Power));
 fn init_wizard_numbers(dag: &mut NumDag) {
     dag.0.add_node(
         WizardNumbers::Power,
-        [&CrystalNumbers::Magic],
-        [],
-        |[m], []| (*m + 1.into()).log10() + 1.into(),
+        equation!(|(m: CrystalNumbers::Magic,)| (*m + 1.into()).log10() + 1.into()),
     );
 }
 
