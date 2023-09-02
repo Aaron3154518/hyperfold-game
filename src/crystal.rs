@@ -84,7 +84,7 @@ fn init_crystal(
         entities,
         e,
         Crystal,
-        render_system::Elevation(Elevations::Crystal as u8),
+        render_system::RenderOpts::new(Elevations::Crystal as u8),
         RenderComponent::new(RenderAsset::new(
             Asset::File("res/wizards/crystal.png".to_string()),
             r,
@@ -107,7 +107,7 @@ fn init_crystal(
     hyperfold_engine::add_components!(
         entities,
         e,
-        render_system::Elevation(Elevations::Crystal as u8),
+        render_system::RenderOpts::new(Elevations::Crystal as u8),
         RenderComponent::new(
             RenderText::new(FontData {
                 w: None,
@@ -150,7 +150,7 @@ fn init_crystal(
     hyperfold_engine::add_components!(
         entities,
         e,
-        render_system::Elevation(Elevations::Background as u8),
+        render_system::RenderOpts::new(Elevations::Background as u8),
         RenderComponent::new(RenderTexture::new(Some(tex))),
         physics::Position(
             rect.clone()

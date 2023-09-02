@@ -42,7 +42,7 @@ pub fn new_fireball(
         entities,
         e,
         Fireball { value: data.value },
-        render_system::Elevation(Elevations::Projectiles as u8),
+        render_system::RenderOpts::new(Elevations::Projectiles as u8),
         render_system::RenderComponent::new(RenderAsset::from_file(
             "res/projectiles/fireball.png",
             r,

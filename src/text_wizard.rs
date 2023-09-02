@@ -92,7 +92,7 @@ fn init_text_wizard(
     hyperfold_engine::add_components!(
         entities,
         e,
-        render_system::Elevation(Elevations::Wizards as u8),
+        render_system::RenderOpts::new(Elevations::Wizards as u8),
         RenderComponent::new(
             RenderText::new(FontData {
                 w: Some(100),

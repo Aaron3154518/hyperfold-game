@@ -5,4 +5,5 @@ pub enum Elevations {
     Crystal,
     Wizards,
     Enemies,
+    Upgrades,
 }

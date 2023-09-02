@@ -8,6 +8,7 @@ mod enemies;
 mod fireball;
 pub mod param_dag;
 mod text_wizard;
+mod upgrades;
 mod utils;
 mod wizard;
 

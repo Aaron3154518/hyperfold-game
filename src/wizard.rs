@@ -61,7 +61,7 @@ fn init_wizard(
         entities,
         e,
         Wizard,
-        render_system::Elevation(Elevations::Wizards as u8),
+        render_system::RenderOpts::new(Elevations::Wizards as u8),
         rc,
         anim,
         physics::Position(Rect {

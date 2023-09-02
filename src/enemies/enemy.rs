@@ -9,7 +9,7 @@ use hyperfold_engine::{
         physics::{PhysicsData, Position},
         render_system::{
             render_data::{Animation, RenderAsset, RenderDataBuilderTrait},
-            Asset, AssetManager, Camera, Elevation, RenderComponent, Renderer,
+            Asset, AssetManager, Camera, RenderComponent, RenderOpts, Renderer,
         },
     },
     utils::rect::{Align, PointF, Rect},
@@ -38,7 +38,7 @@ pub fn spawn_enemy(
         entities,
         e,
         Enemy,
-        Elevation(Elevations::Enemies as u8),
+        RenderOpts::new(Elevations::Enemies as u8),
         RenderComponent::new(
             RenderAsset::new(
                 Asset::File("res/wizards/power_wizard_ss.png".to_string()),
