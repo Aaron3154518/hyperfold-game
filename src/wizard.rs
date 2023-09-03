@@ -1,4 +1,5 @@
 use hyperfold_engine::{
+    add_components,
     ecs::{
         entities::{Entity, NewEntity},
         events::core,
@@ -24,11 +25,13 @@ use hyperfold_engine::{
 };
 
 use crate::{
+    _engine::{Components, Events},
     crystal::{crystal_radius, CrystalNumbers, CrystalPos},
     equation,
     fireball::CreateFireball,
     param_dag::{Node, NodeDefault, NodeTrait, NumDag},
     parameters,
+    upgrades::{OpenUpgrades, Upgrade},
     utils::elevations::Elevations,
 };
 
@@ -47,7 +50,7 @@ struct Wizard;
 
 #[hyperfold_engine::system(Init)]
 fn init_wizard(
-    entities: &mut dyn crate::_engine::Components,
+    entities: &mut dyn Components,
     r: &Renderer,
     am: &mut AssetManager,
     camera: &render_system::Camera,
@@ -57,7 +60,7 @@ fn init_wizard(
     let rc = render_system::RenderComponent::new(
         RenderAsset::from_file("res/wizards/wizard_ss.png", r, am).with_animation(anim),
     );
-    hyperfold_engine::add_components!(
+    add_components!(
         entities,
         e,
         Wizard,
@@ -74,6 +77,16 @@ fn init_wizard(
         DragTrigger::OnMove,
         Timer::new(1000),
     );
+}
+
+#[hyperfold_engine::system(Init)]
+fn init_wizard_upgrades(entities: &mut dyn Components, events: &mut dyn Events) {
+    for i in 0..10 {
+        let e = Entity::new();
+        add_components!(entities, e, Upgrade::new(Wizard, i));
+    }
+
+    events.new_event(OpenUpgrades::new(Wizard));
 }
 
 hyperfold_engine::components!(labels(Wizard), WizardPos, pos: &'a physics::Position,);

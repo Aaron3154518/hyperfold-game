@@ -9,7 +9,7 @@ use std::{
     vec::IntoIter,
 };
 
-use hyperfold_engine::utils::{number::Number, util::get_time};
+use hyperfold_engine::utils::{number::Number, traits::Id, util::get_time};
 use itertools::Itertools;
 
 // Node Structs
@@ -44,7 +44,7 @@ struct RootValue<T> {
     updated: u32,
 }
 
-impl<T: 'static> RootValue<T> {
+impl<T> RootValue<T> {
     pub fn new(id: NodeId, value: T) -> Self {
         Self {
             id,
@@ -142,12 +142,8 @@ fn id(type_id: TypeId, idx: u8) -> NodeId {
 }
 
 // NodeTrait + Node or Root are the only traits that need to be implemented
-pub trait NodeTrait: 'static {
+pub trait NodeTrait: Id {
     fn idx(&self) -> u8;
-
-    fn type_id(&self) -> TypeId {
-        TypeId::of::<Self>()
-    }
 
     fn id(&self) -> NodeId {
         id(self.type_id(), self.idx())
@@ -185,7 +181,7 @@ pub struct Dag<T> {
     nodes: Vec<NodeValue<T>>,
 }
 
-impl<T: 'static> Dag<T> {
+impl<T> Dag<T> {
     pub fn new() -> Self {
         Self {
             roots: Vec::new(),
