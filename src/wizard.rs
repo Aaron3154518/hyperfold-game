@@ -93,13 +93,15 @@ hyperfold_engine::components!(labels(Wizard), WizardPos, pos: &'a physics::Posit
 hyperfold_engine::components!(labels(Wizard), WizardPosMut, pos: &'a mut physics::Position,);
 
 #[hyperfold_engine::system]
-fn drag_wizard(drag: &Drag, WizardPosMut { pos, .. }: WizardPosMut) {
-    pos.0.set_pos(
-        drag.mouse_x as f32,
-        drag.mouse_y as f32,
-        Align::Center,
-        Align::Center,
-    );
+fn drag_wizard(drag: &Drag, WizardPosMut { pos, eid }: WizardPosMut) {
+    if &drag.eid == eid {
+        pos.0.set_pos(
+            drag.mouse_x as f32,
+            drag.mouse_y as f32,
+            Align::Center,
+            Align::Center,
+        );
+    }
 }
 
 #[hyperfold_engine::system]

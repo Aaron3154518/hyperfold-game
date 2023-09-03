@@ -6,9 +6,13 @@ use std::{
 use either::Either::{Left, Right};
 use hyperfold_engine::{
     add_components, components,
-    ecs::entities::{Entity, NewEntity},
+    ecs::{
+        entities::{Entity, NewEntity},
+        events::core::Update,
+    },
     f32,
     framework::{
+        event_system::mouse::{Drag, DragStart, DragState, DragTrigger},
         physics::Position,
         render_system::{
             drawable::Canvas,
@@ -21,31 +25,38 @@ use hyperfold_engine::{
         colors::{BLUE, GRAY, GREEN, RED},
         rect::{Align, Rect},
         traits::Id,
-        util::{AsType, FloatMath},
+        util::FloatMath,
     },
 };
 use itertools::Itertools;
 
-use crate::{_engine::Components, utils::elevations::Elevations};
+use crate::{
+    _engine::{Components, Events},
+    utils::elevations::Elevations,
+};
 
 // Upgrade box
 #[hyperfold_engine::component(Singleton)]
 struct UpgradeBox {
+    v_scroll: f32,
     scroll: f32,
     min_scroll: f32,
     max_scroll: f32,
     back_upgrades: Vec<(Rect, usize)>,
     front_upgrades: Vec<(Rect, usize)>,
+    curr_id: Option<TypeId>,
 }
 
 impl Default for UpgradeBox {
     fn default() -> Self {
         Self {
+            v_scroll: 0.0,
             scroll: 0.0,
             min_scroll: 0.0,
             max_scroll: 0.0,
             back_upgrades: Vec::new(),
             front_upgrades: Vec::new(),
+            curr_id: None,
         }
     }
 }
@@ -68,6 +79,7 @@ fn init_upgrades(entities: &mut dyn Components, screen: &Screen, r: &Renderer) {
         entities,
         e,
         UpgradeBox::default(),
+        DragTrigger::OnMove,
         Position(rect),
         RenderOpts::new(Elevations::Upgrades as u8)
             .absolute()
@@ -130,6 +142,8 @@ fn open_upgrades(
     }: UpgradeBoxPos,
     r: &Renderer,
 ) {
+    up_box.curr_id = Some(*id);
+
     let upgrades = filter_upgrades(upgrades, *id);
     let n = upgrades.len();
 
@@ -184,29 +198,6 @@ fn open_upgrades(
 
     let (cx, cy) = (pos.0.half_w(), pos.0.half_h() - w / 4.0);
 
-    let mut rect_angles = Vec::new();
-    rect_angles.resize(n, None);
-    let (mut back_len, mut front_len) = (0, 0);
-
-    for i in (0..num_steps + 1).rev() {
-        for sign in match i {
-            i if i == 0 || i == num_steps => Left([1]),
-            _ => Right([1, -1]),
-        }
-        .into_iter()
-        {
-            let angle = (min_theta + f32!(i) * f32!(sign) * step + TAU) % TAU;
-            let idx = base_idx - sign * (num_steps - i);
-            if 0 <= idx && (idx as usize) < n {
-                rect_angles[idx as usize] = Some(angle);
-                match angle < PI {
-                    true => back_len += 1,
-                    false => front_len += 1,
-                }
-            }
-        }
-    }
-
     let get_rect = |angle: f32| {
         let angle_diff = ((angle + 3.0 * FRAC_PI_2) % TAU).min((5.0 * FRAC_PI_2 - angle) % TAU);
         Rect::from(
@@ -219,28 +210,43 @@ fn open_upgrades(
         )
     };
 
-    up_box.back_upgrades.reserve(back_len);
-    up_box.front_upgrades.reserve(front_len);
-    for (up, angle) in upgrades.into_iter().zip(rect_angles) {
-        if let Some(angle) = angle {
-            match angle < PI {
-                true => &mut up_box.back_upgrades,
-                false => &mut up_box.front_upgrades,
+    let mut rect_angles = Vec::new();
+    rect_angles.resize(n, None);
+    up_box.front_upgrades.clear();
+    up_box.back_upgrades.clear();
+
+    // This pushes upgrades in order from front-most to back-most
+    for i in (0..num_steps + 1).rev() {
+        for sign in match i {
+            i if i == 0 || i == num_steps => Left([1]),
+            _ => Right([1, -1]),
+        }
+        .into_iter()
+        {
+            let angle = (min_theta + f32!(i) * f32!(sign) * step + TAU) % TAU;
+            let idx = base_idx - sign * (num_steps - i);
+            if 0 <= idx && (idx as usize) < n {
+                let idx = idx as usize;
+                rect_angles[idx] = Some(angle);
+                match angle < PI {
+                    true => &mut up_box.back_upgrades,
+                    false => &mut up_box.front_upgrades,
+                }
+                .push((get_rect(angle), upgrades[idx].up.idx));
             }
-            .push((get_rect(angle), up.up.idx));
         }
     }
 
     opts.set_visible(true);
 
     let new_tex = Texture::new(r, pos.0.w_i32() as u32, pos.0.h_i32() as u32, GRAY);
-    for (rect, idx) in &up_box.back_upgrades {
+    for (rect, idx) in up_box.back_upgrades.iter().rev() {
         new_tex.draw(
             r,
             &mut Rectangle::new().fill(*rect).set_color(heatmap(*idx, n)),
         );
     }
-    for (rect, idx) in &up_box.front_upgrades {
+    for (rect, idx) in up_box.front_upgrades.iter().rev() {
         new_tex.draw(
             r,
             &mut Rectangle::new().fill(*rect).set_color(heatmap(*idx, n)),
@@ -266,5 +272,62 @@ fn heatmap(i: usize, n: usize) -> hyperfold_engine::sdl2::SDL_Color {
         b: (colors[i1].b as f32 * f1 + colors[i2].b as f32 * f2) as u8,
         g: (colors[i1].g as f32 * f1 + colors[i2].g as f32 * f2) as u8,
         a: (colors[i1].a as f32 * f1 + colors[i2].a as f32 * f2) as u8,
+    }
+}
+
+// Dragging
+#[hyperfold_engine::system]
+fn drag_start_upgrade_box(
+    DragStart(id): &DragStart,
+    UpgradeBoxPos { up_box, eid, .. }: UpgradeBoxPos,
+) {
+    if id == eid {
+        up_box.v_scroll = 0.0;
+    }
+}
+
+#[hyperfold_engine::system]
+fn drag_upgrade_box(
+    drag: &Drag,
+    UpgradeBoxPos { up_box, eid, .. }: UpgradeBoxPos,
+    events: &mut dyn Events,
+) {
+    if &drag.eid == eid {
+        let prev = up_box.scroll;
+        up_box.scroll = (up_box.scroll - f32!(drag.mouse_dx))
+            .max(up_box.min_scroll)
+            .min(up_box.max_scroll);
+        up_box.v_scroll = -f32!(drag.mouse_dx) * 25.0;
+        if (prev - up_box.scroll).abs() >= 1.0 {
+            if let Some(id) = up_box.curr_id {
+                events.new_event(OpenUpgrades { id });
+            }
+        }
+    }
+}
+
+#[hyperfold_engine::system]
+fn update_upgrade_box(
+    Update(dt): &Update,
+    UpgradeBoxPos { up_box, eid, .. }: UpgradeBoxPos,
+    events: &mut dyn Events,
+    drag_state: &DragState,
+) {
+    if drag_state.dragging(*eid) {
+        return;
+    }
+
+    let s = f32!(*dt) / 1000.0;
+    let prev = up_box.scroll;
+    up_box.scroll = (up_box.scroll + up_box.v_scroll * s)
+        .max(up_box.min_scroll)
+        .min(up_box.max_scroll);
+    if (prev - up_box.scroll).abs() >= 1.0 {
+        if let Some(id) = up_box.curr_id {
+            events.new_event(OpenUpgrades { id });
+        }
+        up_box.v_scroll *= 0.01_f32.powf(s);
+    } else {
+        up_box.v_scroll = 0.0;
     }
 }
