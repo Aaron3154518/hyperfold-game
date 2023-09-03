@@ -81,7 +81,7 @@ fn init_wizard(
 
 #[hyperfold_engine::system(Init)]
 fn init_wizard_upgrades(entities: &mut dyn Components, events: &mut dyn Events) {
-    for i in 0..10 {
+    for i in 0..25 {
         let e = Entity::new();
         add_components!(entities, e, Upgrade::new(Wizard, i));
     }

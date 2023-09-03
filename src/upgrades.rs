@@ -1,6 +1,7 @@
 use std::{
     any::TypeId,
     f32::consts::{FRAC_PI_2, PI, TAU},
+    iter::{once, repeat},
 };
 
 use either::Either::{Left, Right};
@@ -8,7 +9,7 @@ use hyperfold_engine::{
     add_components, components,
     ecs::{
         entities::{Entity, NewEntity},
-        events::core::Update,
+        events::core::{PreRender, Update},
     },
     f32,
     framework::{
@@ -23,6 +24,7 @@ use hyperfold_engine::{
     },
     utils::{
         colors::{BLUE, GRAY, GREEN, RED},
+        math::NormalizeAngle,
         rect::{Align, Rect},
         traits::Id,
         util::FloatMath,
@@ -30,10 +32,7 @@ use hyperfold_engine::{
 };
 use itertools::Itertools;
 
-use crate::{
-    _engine::{Components, Events},
-    utils::elevations::Elevations,
-};
+use crate::{_engine::Components, utils::elevations::Elevations};
 
 // Upgrade box
 #[hyperfold_engine::component(Singleton)]
@@ -44,7 +43,9 @@ struct UpgradeBox {
     max_scroll: f32,
     back_upgrades: Vec<(Rect, usize)>,
     front_upgrades: Vec<(Rect, usize)>,
-    curr_id: Option<TypeId>,
+    upgrade_rects: Vec<(Rect, usize)>,
+    open_id: Option<TypeId>,
+    update: bool,
 }
 
 impl Default for UpgradeBox {
@@ -56,7 +57,9 @@ impl Default for UpgradeBox {
             max_scroll: 0.0,
             back_upgrades: Vec::new(),
             front_upgrades: Vec::new(),
-            curr_id: None,
+            upgrade_rects: Vec::new(),
+            open_id: None,
+            update: false,
         }
     }
 }
@@ -105,98 +108,50 @@ impl Upgrade {
     }
 }
 
-// Switch upgrade list
-#[hyperfold_engine::event]
-struct OpenUpgrades {
-    id: TypeId,
-}
-
-impl OpenUpgrades {
-    pub fn new(t: impl Id) -> Self {
-        Self { id: t.type_id() }
-    }
-}
-
 components!(Upgrades, up: &'a Upgrade);
-components!(UpgradeBoxPos, up_box: &'a mut UpgradeBox, pos: &'a Position, opts: &'a mut RenderOpts, tex: &'a mut RenderComponent);
+components!(UpgradeBoxData, up_box: &'a mut UpgradeBox);
+components!(UpgradeBoxDrawArgs, up_box: &'a mut UpgradeBox, pos: &'a Position, opts: &'a mut RenderOpts, tex: &'a mut RenderComponent);
 
-// Returns Upgrades with the given Id, sorted by index
-pub fn filter_upgrades(upgrades: Vec<Upgrades>, id: TypeId) -> Vec<Upgrades> {
-    upgrades
-        .into_iter()
-        .filter(|u| u.up.id == id)
-        .sorted_by_key(|u| u.up.idx)
-        .collect()
-}
-
+// Draw upgrade box
 #[hyperfold_engine::system]
-fn open_upgrades(
-    OpenUpgrades { id }: &OpenUpgrades,
+fn draw_upgrades(
+    _: &PreRender,
     upgrades: Vec<Upgrades>,
-    UpgradeBoxPos {
+    UpgradeBoxDrawArgs {
         pos,
         up_box,
         opts,
         tex,
         ..
-    }: UpgradeBoxPos,
+    }: UpgradeBoxDrawArgs,
     r: &Renderer,
 ) {
-    up_box.curr_id = Some(*id);
+    if !up_box.update {
+        return;
+    }
 
-    let upgrades = filter_upgrades(upgrades, *id);
+    let id = match up_box.open_id {
+        Some(id) => id,
+        None => {
+            opts.visible = false;
+            return;
+        }
+    };
+
+    let upgrades = filter_upgrades(upgrades, id);
     let n = upgrades.len();
 
     up_box.max_scroll = match pos.0.empty() {
         true => 0.0,
         false => pos.0.w() * f32!(n.max(1) - 1) / (pos.0.w() * 2.0 / pos.0.h()).floor(),
     };
-    // mMaxScroll = pos.empty()
-    //                  ? 0
-    //                  : pos.w() * (mUpgrades ? mUpgrades->size() - 1 : 0) /
-    //                        floor(pos.w() * 2 / pos.h());
 
     // Largest width of an upgrade icon
     // Also the scroll distance between each upgrade
     let w = pos.0.h() / 2.0;
+    let (cx, cy) = (pos.0.half_w(), pos.0.half_h() - w / 4.0);
     // x/y radii of the upgrade ellipse
     let (rx, ry) = ((pos.0.w() - w) / 2.0, (pos.0.h() - w) / 2.0);
-
-    // Position of central image inside ellipse
-    let img_rect = Rect::from(
-        pos.0.cx(),
-        pos.0.cy(),
-        w * 2.0,
-        w * 2.0,
-        Align::Center,
-        Align::Center,
-    );
-    // TODO: render image
-    // mImg.setDest(imgR);
-
-    // Number of upgrades per quadrant
-    // TODO: double in back
-    let num_steps = (pos.0.w() / w).floor_i32();
-    let step = PI / f32!(num_steps);
-    let err = 1e-5;
-
-    // Compute angular displacement of the first upgrade
-    let scroll_angle = up_box.scroll * PI / pos.0.w();
-    // Compute the index displacement of the first upgrade
-    // Use .5 - ERR so we don't round up at .5
-    let base_idx = (scroll_angle / step + 0.5 - err).floor_i32();
-    // Constrain scroll angle to [0, 2PI)
-    let scroll_angle = scroll_angle % TAU;
-    // Transform to CW with 0 at PI/2
-    let theta = (5.0 * FRAC_PI_2 - scroll_angle) % TAU;
-    // Find the step closest to PI/2
-    let min_theta = (theta + 3.0 * FRAC_PI_2) % step;
-    let min_theta = match min_theta + err < step - min_theta {
-        true => min_theta + FRAC_PI_2,
-        false => min_theta + FRAC_PI_2 - step,
-    };
-
-    let (cx, cy) = (pos.0.half_w(), pos.0.half_h() - w / 4.0);
 
     let get_rect = |angle: f32| {
         let angle_diff = ((angle + 3.0 * FRAC_PI_2) % TAU).min((5.0 * FRAC_PI_2 - angle) % TAU);
@@ -210,49 +165,92 @@ fn open_upgrades(
         )
     };
 
-    let mut rect_angles = Vec::new();
-    rect_angles.resize(n, None);
-    up_box.front_upgrades.clear();
-    up_box.back_upgrades.clear();
+    // Number of front upgrades
+    let num_steps = (pos.0.w() / w).floor_i32();
+    let fg_step = PI / f32!(num_steps);
+    let bg_step = fg_step / 2.0;
 
-    // This pushes upgrades in order from front-most to back-most
-    for i in (0..num_steps + 1).rev() {
-        for sign in match i {
-            i if i == 0 || i == num_steps => Left([1]),
-            _ => Right([1, -1]),
+    // Compute angular displacement of the first upgrade
+    // TODO: smooth transition distance between back and front
+    let mut angle = 3.0 * FRAC_PI_2 - up_box.scroll * PI / pos.0.w();
+    let mut idx = 0;
+    let mut rects = Vec::new();
+    while angle < 5.0 * FRAC_PI_2 && idx < n {
+        if angle >= FRAC_PI_2 {
+            rects.push((get_rect(angle), idx, angle));
         }
-        .into_iter()
-        {
-            let angle = (min_theta + f32!(i) * f32!(sign) * step + TAU) % TAU;
-            let idx = base_idx - sign * (num_steps - i);
-            if 0 <= idx && (idx as usize) < n {
-                let idx = idx as usize;
-                rect_angles[idx] = Some(angle);
-                match angle < PI {
-                    true => &mut up_box.back_upgrades,
-                    false => &mut up_box.front_upgrades,
-                }
-                .push((get_rect(angle), upgrades[idx].up.idx));
-            }
-        }
+        angle += match angle.normalize_rad() < PI {
+            true => bg_step,
+            false => fg_step,
+        };
+        idx += 1;
     }
+
+    up_box.upgrade_rects = rects
+        .into_iter()
+        // Sort top to bottom (render order)
+        .sorted_by(|(.., a1), (.., a2)| {
+            a1.sin()
+                .partial_cmp(&a2.sin())
+                .expect("NaN When sorting upgrade rects")
+        })
+        .map(|(r, i, _)| (r, i))
+        .collect();
 
     opts.set_visible(true);
 
+    // Position of central image inside ellipse
+    let img_rect = Rect::from(
+        pos.0.cx(),
+        pos.0.cy(),
+        w * 2.0,
+        w * 2.0,
+        Align::Center,
+        Align::Center,
+    );
+    // TODO: render image
+    // mImg.setDest(imgR);
+
     let new_tex = Texture::new(r, pos.0.w_i32() as u32, pos.0.h_i32() as u32, GRAY);
-    for (rect, idx) in up_box.back_upgrades.iter().rev() {
-        new_tex.draw(
-            r,
-            &mut Rectangle::new().fill(*rect).set_color(heatmap(*idx, n)),
-        );
-    }
-    for (rect, idx) in up_box.front_upgrades.iter().rev() {
+    for (rect, idx) in &up_box.upgrade_rects {
         new_tex.draw(
             r,
             &mut Rectangle::new().fill(*rect).set_color(heatmap(*idx, n)),
         );
     }
     tex.set(RenderTexture::new(Some(new_tex)));
+
+    up_box.update = false;
+}
+
+// Switch upgrade list
+#[hyperfold_engine::event]
+struct OpenUpgrades {
+    id: TypeId,
+}
+
+impl OpenUpgrades {
+    pub fn new(t: impl Id) -> Self {
+        Self { id: t.type_id() }
+    }
+}
+
+// Returns Upgrades with the given Id, sorted by index
+pub fn filter_upgrades(upgrades: Vec<Upgrades>, id: TypeId) -> Vec<Upgrades> {
+    upgrades
+        .into_iter()
+        .filter(|u| u.up.id == id)
+        .sorted_by_key(|u| u.up.idx)
+        .collect()
+}
+
+#[hyperfold_engine::system]
+fn open_upgrades(
+    OpenUpgrades { id }: &OpenUpgrades,
+    UpgradeBoxData { up_box, .. }: UpgradeBoxData,
+) {
+    up_box.open_id = Some(*id);
+    up_box.update = true;
 }
 
 fn heatmap(i: usize, n: usize) -> hyperfold_engine::sdl2::SDL_Color {
@@ -275,11 +273,12 @@ fn heatmap(i: usize, n: usize) -> hyperfold_engine::sdl2::SDL_Color {
     }
 }
 
+// TODO:
 // Dragging
 #[hyperfold_engine::system]
 fn drag_start_upgrade_box(
     DragStart(id): &DragStart,
-    UpgradeBoxPos { up_box, eid, .. }: UpgradeBoxPos,
+    UpgradeBoxData { up_box, eid }: UpgradeBoxData,
 ) {
     if id == eid {
         up_box.v_scroll = 0.0;
@@ -287,11 +286,7 @@ fn drag_start_upgrade_box(
 }
 
 #[hyperfold_engine::system]
-fn drag_upgrade_box(
-    drag: &Drag,
-    UpgradeBoxPos { up_box, eid, .. }: UpgradeBoxPos,
-    events: &mut dyn Events,
-) {
+fn drag_upgrade_box(drag: &Drag, UpgradeBoxData { up_box, eid }: UpgradeBoxData) {
     if &drag.eid == eid {
         let prev = up_box.scroll;
         up_box.scroll = (up_box.scroll - f32!(drag.mouse_dx))
@@ -299,9 +294,7 @@ fn drag_upgrade_box(
             .min(up_box.max_scroll);
         up_box.v_scroll = -f32!(drag.mouse_dx) * 25.0;
         if (prev - up_box.scroll).abs() >= 1.0 {
-            if let Some(id) = up_box.curr_id {
-                events.new_event(OpenUpgrades { id });
-            }
+            up_box.update = true;
         }
     }
 }
@@ -309,8 +302,7 @@ fn drag_upgrade_box(
 #[hyperfold_engine::system]
 fn update_upgrade_box(
     Update(dt): &Update,
-    UpgradeBoxPos { up_box, eid, .. }: UpgradeBoxPos,
-    events: &mut dyn Events,
+    UpgradeBoxData { up_box, eid }: UpgradeBoxData,
     drag_state: &DragState,
 ) {
     if drag_state.dragging(*eid) {
@@ -323,10 +315,8 @@ fn update_upgrade_box(
         .max(up_box.min_scroll)
         .min(up_box.max_scroll);
     if (prev - up_box.scroll).abs() >= 1.0 {
-        if let Some(id) = up_box.curr_id {
-            events.new_event(OpenUpgrades { id });
-        }
         up_box.v_scroll *= 0.01_f32.powf(s);
+        up_box.update = true;
     } else {
         up_box.v_scroll = 0.0;
     }
