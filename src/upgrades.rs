@@ -167,11 +167,11 @@ fn draw_upgrades(
 
     // Number of front upgrades
     let num_steps = (pos.0.w() / w).floor_i32();
-    let fg_step = PI / f32!(num_steps);
-    let bg_step = fg_step / 2.0;
+    let step = PI / f32!(num_steps);
+    // Solve for da when a = PI/2
+    let min_step = step * PI / 2.0 / (PI - step);
 
     // Compute angular displacement of the first upgrade
-    // TODO: smooth transition distance between back and front
     let mut angle = 3.0 * FRAC_PI_2 - up_box.scroll * PI / pos.0.w();
     let mut idx = 0;
     let mut rects = Vec::new();
@@ -179,9 +179,19 @@ fn draw_upgrades(
         if angle >= FRAC_PI_2 {
             rects.push((get_rect(angle), idx, angle));
         }
-        angle += match angle.normalize_rad() < PI {
-            true => bg_step,
-            false => fg_step,
+        let a = angle.normalize_rad();
+        angle += match a {
+            // Linear scaling
+            a if a <= FRAC_PI_2 - min_step => step * (2.0 - a / FRAC_PI_2) / 2.0,
+            // Constant min step to smooth accross PI/2
+            a if a <= FRAC_PI_2 => min_step,
+            // Predictive linear scaling
+            // x = a + da
+            // da = s / 2 + s / 2 * (x - pi/2) / (pi/2) = s * x / pi
+            //    = a * s / (pi - s)
+            a if a <= PI - step => a * step / (PI - step),
+            // Constant max step
+            _ => step,
         };
         idx += 1;
     }
@@ -193,6 +203,7 @@ fn draw_upgrades(
             a1.sin()
                 .partial_cmp(&a2.sin())
                 .expect("NaN When sorting upgrade rects")
+                .reverse()
         })
         .map(|(r, i, _)| (r, i))
         .collect();
