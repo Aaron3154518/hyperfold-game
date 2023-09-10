@@ -1,10 +1,8 @@
 use std::{
     any::TypeId,
     f32::consts::{FRAC_PI_2, PI, TAU},
-    iter::{once, repeat},
 };
 
-use either::Either::{Left, Right};
 use hyperfold_engine::{
     add_components, components,
     ecs::{
@@ -41,8 +39,6 @@ struct UpgradeBox {
     scroll: f32,
     min_scroll: f32,
     max_scroll: f32,
-    back_upgrades: Vec<(Rect, usize)>,
-    front_upgrades: Vec<(Rect, usize)>,
     upgrade_rects: Vec<(Rect, usize)>,
     open_id: Option<TypeId>,
     update: bool,
@@ -55,8 +51,6 @@ impl Default for UpgradeBox {
             scroll: 0.0,
             min_scroll: 0.0,
             max_scroll: 0.0,
-            back_upgrades: Vec::new(),
-            front_upgrades: Vec::new(),
             upgrade_rects: Vec::new(),
             open_id: None,
             update: false,
@@ -165,11 +159,25 @@ fn draw_upgrades(
         )
     };
 
+    // Higher means closer back upgrades
+    let m = 10.0;
     // Number of front upgrades
     let num_steps = (pos.0.w() / w).floor_i32();
     let step = PI / f32!(num_steps);
+    // Decays from step @ a=0 to step/m @ a = PI/2
+    let lin_da = |a: f32| step * (1.0 - a / FRAC_PI_2 * (m - 1.0) / m);
+    // x = a + da, da = lin_da(PI - x)
+    // da(a) = (step*m*pi/2 + s*(m-1)*(a-pi)) / (m*pi/2 - s*(m-1))
+    let pred_da = |a: f32| {
+        let t = step * (m - 1.0);
+        let u = m * FRAC_PI_2;
+        (step * u + t * (a - PI)) / (u - t)
+    };
     // Solve for da when a = PI/2
-    let min_step = step * PI / 2.0 / (PI - step);
+    let min_step = pred_da(FRAC_PI_2);
+
+    // TODO: Fix max_scroll
+    // TODO: compress near pi/2, stretch near 0,pi
 
     // Compute angular displacement of the first upgrade
     let mut angle = 3.0 * FRAC_PI_2 - up_box.scroll * PI / pos.0.w();
@@ -182,14 +190,11 @@ fn draw_upgrades(
         let a = angle.normalize_rad();
         angle += match a {
             // Linear scaling
-            a if a <= FRAC_PI_2 - min_step => step * (2.0 - a / FRAC_PI_2) / 2.0,
+            a if a <= FRAC_PI_2 - min_step => lin_da(a),
             // Constant min step to smooth accross PI/2
             a if a <= FRAC_PI_2 => min_step,
             // Predictive linear scaling
-            // x = a + da
-            // da = s / 2 + s / 2 * (x - pi/2) / (pi/2) = s * x / pi
-            //    = a * s / (pi - s)
-            a if a <= PI - step => a * step / (PI - step),
+            a if a <= PI - step => pred_da(a),
             // Constant max step
             _ => step,
         };
