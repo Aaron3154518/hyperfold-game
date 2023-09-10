@@ -135,11 +135,6 @@ fn draw_upgrades(
     let upgrades = filter_upgrades(upgrades, id);
     let n = upgrades.len();
 
-    up_box.max_scroll = match pos.0.empty() {
-        true => 0.0,
-        false => pos.0.w() * f32!(n.max(1) - 1) / (pos.0.w() * 2.0 / pos.0.h()).floor(),
-    };
-
     // Largest width of an upgrade icon
     // Also the scroll distance between each upgrade
     let w = pos.0.h() / 2.0;
@@ -159,36 +154,29 @@ fn draw_upgrades(
         )
     };
 
-    // Higher means closer back upgrades
-    let m = 10.0;
-    // Number of front upgrades
-    let num_steps = (pos.0.w() / w).floor_i32();
-    let step = PI / f32!(num_steps);
-    // Decays from step @ a=0 to step/m @ a = PI/2
-    let lin_da = |a: f32| step * (1.0 - a / FRAC_PI_2 * (m - 1.0) / m);
+    // Higher means closer/more back upgrades
+    const M: f32 = 4.0;
+    // Start location of the first upgrade at 0 scroll
+    const START_ANGLE: f32 = 3.0 * FRAC_PI_2;
+
+    // Conversion from scroll distance to angle displacement
+    let scroll_to_deg = PI / pos.0.w();
+    // One width of scrolling separates each upgrade
+    let step = w * scroll_to_deg;
+    // Decays from step @ a=0 to step/M @ a = PI/2
+    let lin_da = |a: f32| step * (1.0 - a / FRAC_PI_2 * (M - 1.0) / M);
     // x = a + da, da = lin_da(PI - x)
-    // da(a) = (step*m*pi/2 + s*(m-1)*(a-pi)) / (m*pi/2 - s*(m-1))
+    // da(a) = (step*M*pi/2 + s*(M-1)*(a-pi)) / (M*pi/2 - s*(M-1))
     let pred_da = |a: f32| {
-        let t = step * (m - 1.0);
-        let u = m * FRAC_PI_2;
+        let t = step * (M - 1.0);
+        let u = M * FRAC_PI_2;
         (step * u + t * (a - PI)) / (u - t)
     };
     // Solve for da when a = PI/2
     let min_step = pred_da(FRAC_PI_2);
-
-    // TODO: Fix max_scroll
-    // TODO: compress near pi/2, stretch near 0,pi
-
-    // Compute angular displacement of the first upgrade
-    let mut angle = 3.0 * FRAC_PI_2 - up_box.scroll * PI / pos.0.w();
-    let mut idx = 0;
-    let mut rects = Vec::new();
-    while angle < 5.0 * FRAC_PI_2 && idx < n {
-        if angle >= FRAC_PI_2 {
-            rects.push((get_rect(angle), idx, angle));
-        }
-        let a = angle.normalize_rad();
-        angle += match a {
+    // Full function for calculating the da step CCW from the current angle
+    let da = |a: f32| {
+        match a.normalize_rad() {
             // Linear scaling
             a if a <= FRAC_PI_2 - min_step => lin_da(a),
             // Constant min step to smooth accross PI/2
@@ -197,9 +185,33 @@ fn draw_upgrades(
             a if a <= PI - step => pred_da(a),
             // Constant max step
             _ => step,
-        };
+        }
+    };
+
+    // Compute angular displacement of the first upgrade
+    let mut angle = START_ANGLE - up_box.scroll * scroll_to_deg;
+    // We want to trace out the total angle from the last upgrade CW to the first upgrade
+    // However da(a) is setup to calculate angles moving CCW
+    // Instead, we flip the last upgrade accross the y-axis and trace out CCW
+    let mut max_angle = PI - START_ANGLE;
+    let mut idx = 0;
+    let mut rects = Vec::new();
+    while idx < n {
+        // Add a new rect to be rendered
+        if angle < 5.0 * FRAC_PI_2 {
+            if angle >= FRAC_PI_2 {
+                rects.push((get_rect(angle), idx, angle));
+            }
+            angle += da(angle);
+        }
+        // Compute angle cost of all upgrades
+        if idx < n - 1 {
+            max_angle += da(max_angle);
+        }
         idx += 1;
     }
+
+    up_box.max_scroll = (max_angle - PI + START_ANGLE) / scroll_to_deg;
 
     up_box.upgrade_rects = rects
         .into_iter()
@@ -306,8 +318,8 @@ fn drag_upgrade_box(drag: &Drag, UpgradeBoxData { up_box, eid }: UpgradeBoxData)
     if &drag.eid == eid {
         let prev = up_box.scroll;
         up_box.scroll = (up_box.scroll - f32!(drag.mouse_dx))
-            .max(up_box.min_scroll)
-            .min(up_box.max_scroll);
+            .min(up_box.max_scroll)
+            .max(up_box.min_scroll);
         up_box.v_scroll = -f32!(drag.mouse_dx) * 25.0;
         if (prev - up_box.scroll).abs() >= 1.0 {
             up_box.update = true;
